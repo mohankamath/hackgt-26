@@ -1,0 +1,10 @@
+fastapi==0.141.1
+uvicorn==0.54.0
+python-dotenv==1.2.3
+pydantic==2.13.5
+firebase-admin==7.7.0
+openai==3.19.2
+aiohttp==3.14.3
+pillow==12.3.0
+discord.py-self==2.1.0
+instagrapi==3.0.14

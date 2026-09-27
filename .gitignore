@@ -1,0 +1,31 @@
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.swp
+
+# Env + secrets
+.env
+.env.local
+.env.*.local
+*firebase-adminsdk*.json
+serviceAccountKey.json
+backend/instagram_session.json
+backend/backups/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+*.log
+coverage/
