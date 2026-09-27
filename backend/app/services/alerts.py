@@ -7,7 +7,7 @@ import time
 
 from app.util import utcnow
 
-log = logging.getLogger("safeguard.alerts")
+log = logging.getLogger("screened.alerts")
 
 ALERT_TYPES = (
     "new_contact",

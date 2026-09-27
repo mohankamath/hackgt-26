@@ -1,6 +1,6 @@
 """Curated word and phrase lists for the fast local moderation layer.
 
-Ported from the original SafeGuard ``models/profanity_data.py`` and trimmed down.
+Ported from the original project's ``models/profanity_data.py`` and trimmed down.
 The old list mixed real profanity with everyday words ("video", "photo", "ice", "slow",
 "hell"...) which caused constant false positives. Context-dependent categories
 (threats, self-harm, drugs, bullying, hate) are now left to OpenAI omni-moderation,

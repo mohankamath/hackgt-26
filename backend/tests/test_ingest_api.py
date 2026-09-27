@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from app.config import Config
 from app.db import firestore as fs
 from app.main import create_app
-from app.services.ingest import SafeGuardService
+from app.services.ingest import ScreenedService
 
 T0 = datetime(2026, 9, 26, 12, 0, tzinfo=timezone.utc)
 
@@ -49,7 +49,7 @@ def payload(i, text, user="99", **extra):
 @pytest.fixture
 def service(store, fake_ai):
     fake_ai.completions.update({"thread_risk": THREAD_HIGH, "contact_vetting": VET_BLOCK, "coach_tip": {"tip": "Talk to a parent."}})
-    return SafeGuardService(store, workers=1, debounce_seconds=0.01)
+    return ScreenedService(store, workers=1, debounce_seconds=0.01)
 
 
 async def settle(service):

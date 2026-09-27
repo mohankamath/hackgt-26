@@ -11,7 +11,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       headers: { 'Content-Type': 'application/json', ...(init.headers ?? {}) },
     })
   } catch {
-    throw new Error("Can't reach the SafeGuard server. Is the backend running?")
+    throw new Error("Can't reach the Screened server. Is the backend running?")
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))

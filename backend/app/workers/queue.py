@@ -11,7 +11,7 @@ import asyncio
 import logging
 from typing import Any, Awaitable, Callable
 
-log = logging.getLogger("safeguard.queue")
+log = logging.getLogger("screened.queue")
 
 Handler = Callable[[Any], Awaitable[Any]]
 

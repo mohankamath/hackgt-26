@@ -14,7 +14,7 @@ from app.ai import client as ai
 from app.moderation import pii as pii_mod
 from app.moderation import text as text_mod
 
-log = logging.getLogger("safeguard.ai.coach")
+log = logging.getLogger("screened.ai.coach")
 
 # situation key -> (description for the LLM, fallback tip)
 SITUATIONS: dict[str, tuple[str, str]] = {

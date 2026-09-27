@@ -1,1 +1,1 @@
-"""SafeGuard 2.0 backend package."""
+"""Screened backend package."""

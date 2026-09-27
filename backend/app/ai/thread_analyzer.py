@@ -21,7 +21,7 @@ from typing import Awaitable, Callable
 from app import policy
 from app.ai import client as ai
 
-log = logging.getLogger("safeguard.ai.thread")
+log = logging.getLogger("screened.ai.thread")
 
 SIGNAL_TYPES = [
     "flattery",

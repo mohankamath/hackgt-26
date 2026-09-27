@@ -1,4 +1,4 @@
-# SafeGuard frontend
+# Screened frontend
 
 React 19, Vite 7, Tailwind 4, the Firebase JS SDK, and Recharts. See the [root README](../README.md) for setup.
 

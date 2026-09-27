@@ -15,9 +15,9 @@ from typing import TYPE_CHECKING
 import discord
 
 if TYPE_CHECKING:
-    from app.services.ingest import SafeGuardService
+    from app.services.ingest import ScreenedService
 
-log = logging.getLogger("safeguard.discord")
+log = logging.getLogger("screened.discord")
 
 
 def _avatar_url(user) -> str | None:
@@ -48,7 +48,7 @@ def _channel_name(channel, me_id: int) -> str:
 class DiscordPlatform:
     name = "discord"
 
-    def __init__(self, service: "SafeGuardService", token: str, dms_only: bool = True) -> None:
+    def __init__(self, service: "ScreenedService", token: str, dms_only: bool = True) -> None:
         self.service = service
         self.token = token
         self.dms_only = dms_only

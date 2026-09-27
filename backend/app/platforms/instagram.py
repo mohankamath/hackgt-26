@@ -22,9 +22,9 @@ from typing import TYPE_CHECKING
 from app.config import BACKEND_DIR
 
 if TYPE_CHECKING:
-    from app.services.ingest import SafeGuardService
+    from app.services.ingest import ScreenedService
 
-log = logging.getLogger("safeguard.instagram")
+log = logging.getLogger("screened.instagram")
 
 SESSION_CACHE_FILE = BACKEND_DIR / "instagram_session.json"
 RATE_LIMIT_SLEEP_SECONDS = 600
@@ -84,7 +84,7 @@ class InstagramPlatform:
 
     def __init__(
         self,
-        service: "SafeGuardService",
+        service: "ScreenedService",
         session_id: str = "",
         poll_interval: int = 30,
         *,

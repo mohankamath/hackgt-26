@@ -15,7 +15,7 @@ from app import policy
 from app.moderation import image as image_mod
 from app.moderation import text as text_mod
 
-log = logging.getLogger("safeguard.moderation.pipeline")
+log = logging.getLogger("screened.moderation.pipeline")
 
 _IMAGE_EXT = re.compile(r"\.(png|jpe?g|gif|webp|bmp|avif|heic|tiff?)(\?|$)", re.IGNORECASE)
 _VIDEO_EXT = re.compile(r"\.(mp4|mov|webm|mkv|avi|m4v)(\?|$)", re.IGNORECASE)

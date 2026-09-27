@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * SafeGuard "Deep Water" theme.
+ * Screened "Deep Water" theme.
  * Semantic tokens so components read as intent (surface / line / fg / muted / accent / ai)
  * instead of raw palette names.
  */

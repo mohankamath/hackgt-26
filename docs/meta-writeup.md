@@ -1,4 +1,4 @@
-# SafeGuard: Meta "Bringing People Closer Together with AI" write-up (draft)
+# Screened: Meta "Bringing People Closer Together with AI" write-up (draft)
 
 ## Who it's for
 
@@ -12,7 +12,7 @@ Kids aged roughly 8 to 13 who are starting to use Discord and Instagram DMs, and
 
 ## Why AI is essential
 
-Grooming almost never looks harmful one message at a time. "You're so mature for your age", "what school do you go to?", and "don't tell your mom we talk" all pass a keyword filter. SafeGuard's thread analyzer reads the whole conversation and names the pattern building across it (flattery, then personal questions, then secrecy). It cites the exact messages as evidence and explains the pattern in plain language. The same reasoning powers contact vetting and the digest. OpenAI's multimodal moderation checks every image and profile picture for explicit or violent content, which the original homemade model could not do reliably.
+Grooming almost never looks harmful one message at a time. "You're so mature for your age", "what school do you go to?", and "don't tell your mom we talk" all pass a keyword filter. Screened's thread analyzer reads the whole conversation and names the pattern building across it (flattery, then personal questions, then secrecy). It cites the exact messages as evidence and explains the pattern in plain language. The same reasoning powers contact vetting and the digest. OpenAI's multimodal moderation checks every image and profile picture for explicit or violent content, which the original homemade model could not do reliably.
 
 ## Demo storyline (2 to 3 minutes)
 

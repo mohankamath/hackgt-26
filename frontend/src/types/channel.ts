@@ -66,7 +66,7 @@ export function previewText(msg: FirestoreMessage): string {
 
 // ── Read markers (localStorage) ────────────────────────────────────
 
-const READ_MARKERS_KEY = 'safeguard_read_markers'
+const READ_MARKERS_KEY = 'screened_read_markers'
 
 function getReadMarkers(): Record<string, number> {
   try {

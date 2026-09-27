@@ -47,7 +47,7 @@ function HomePage() {
       <section className="relative hidden lg:flex flex-col justify-between p-12 xl:p-16">
         <div className="flex items-center gap-3">
           <Logo size={36} />
-          <span className="font-display text-xl font-semibold tracking-tight">SafeGuard</span>
+          <span className="font-display text-xl font-semibold tracking-tight">Screened</span>
         </div>
         <div className="max-w-xl">
           <p className="text-accent text-sm font-semibold tracking-[0.18em] uppercase mb-4">Safer DMs for kids</p>
@@ -81,7 +81,7 @@ function HomePage() {
         <div className="w-full max-w-[400px] panel p-8 backdrop-blur-xl bg-surface/80 animate-pop-in">
           <div className="lg:hidden flex items-center gap-2.5 mb-6">
             <Logo size={32} />
-            <span className="font-display text-lg font-semibold">SafeGuard</span>
+            <span className="font-display text-lg font-semibold">Screened</span>
           </div>
           <h2 className="text-2xl font-semibold m-0">Welcome back</h2>
           <p className="text-sm text-muted mt-1 mb-6">Sign in to your family's space.</p>

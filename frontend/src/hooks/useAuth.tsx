@@ -24,7 +24,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthState | null>(() => {
     try {
-      const stored = sessionStorage.getItem('safeguard_auth')
+      const stored = sessionStorage.getItem('screened_auth')
       return stored ? JSON.parse(stored) : null
     } catch {
       return null
@@ -38,13 +38,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (cred.password !== password) return 'Incorrect password'
     const state: AuthState = { role: cred.role, username: key }
     setUser(state)
-    sessionStorage.setItem('safeguard_auth', JSON.stringify(state))
+    sessionStorage.setItem('screened_auth', JSON.stringify(state))
     return null // no error
   }, [])
 
   const logout = useCallback(() => {
     setUser(null)
-    sessionStorage.removeItem('safeguard_auth')
+    sessionStorage.removeItem('screened_auth')
   }, [])
 
   return (

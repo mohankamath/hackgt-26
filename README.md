@@ -1,8 +1,8 @@
-# SafeGuard 2.0
+# Screened
 
-SafeGuard puts a kid's Discord and Instagram DMs into one safe inbox. AI checks every message and image, reads whole conversations for grooming patterns, and vets new contacts. It helps parents talk *with* their kids instead of just blocking everything.
+Screened puts a kid's Discord and Instagram DMs into one safe inbox. AI checks every message and image, reads whole conversations for grooming patterns, and vets new contacts. It helps parents talk *with* their kids instead of just blocking everything.
 
-Built for HackGT 13: the Oracle of the Deep (ML/AI) track and Meta's "Bringing People Closer Together with AI" challenge. This rebuilds the original SafeGuard: the homemade RandomForest/DistilBERT/Ollama stack is replaced by OpenAI moderation and reasoning.
+Built for HackGT 13: the Oracle of the Deep (ML/AI) track and Meta's "Bringing People Closer Together with AI" challenge. This rebuilds an earlier hackathon version of the project: its homemade RandomForest/DistilBERT/Ollama stack is replaced by OpenAI moderation and reasoning.
 
 ## What the AI does
 

@@ -125,7 +125,7 @@ export default function ChatSidebar({ channels, selectedChannel, loading, error,
       </div>
 
       <div className="px-4 py-3 border-t border-line flex items-center gap-2 text-[0.7rem] text-subtle">
-        <Logo size={16} /> Protected by SafeGuard
+        <Logo size={16} /> Protected by Screened
       </div>
     </aside>
   )

@@ -19,7 +19,7 @@ from app import policy
 from app.ai import client as ai
 from app.moderation import profanity_data as data
 
-log = logging.getLogger("safeguard.moderation.text")
+log = logging.getLogger("screened.moderation.text")
 
 MASK = "•••"
 _B = r"(?<![a-z0-9])"  # left word boundary on normalised text

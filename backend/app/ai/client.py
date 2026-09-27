@@ -14,7 +14,7 @@ from openai import AsyncOpenAI
 
 from app.config import Config, load_config
 
-log = logging.getLogger("safeguard.ai")
+log = logging.getLogger("screened.ai")
 
 
 class AIError(RuntimeError):

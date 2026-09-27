@@ -1,4 +1,4 @@
-"""SafeGuard 2.0 FastAPI app.
+"""Screened FastAPI app.
 
 Run:  cd backend && .venv/bin/python -m app.main     (or: uvicorn app.main:app --reload)
 
@@ -23,9 +23,9 @@ from app.ai import coach
 from app.config import Config, load_config
 from app.db.firestore import FirestoreDB
 from app.services.contacts import InvalidStatus
-from app.services.ingest import SafeGuardService
+from app.services.ingest import ScreenedService
 
-log = logging.getLogger("safeguard")
+log = logging.getLogger("screened")
 
 
 # ── Request models ──────────────────────────────────────────────────
@@ -66,7 +66,7 @@ def create_app(config: Config | None = None, store: FirestoreDB | None = None, s
         if db is None:
             db = FirestoreDB()
             await asyncio.to_thread(db.init, config)
-        service = SafeGuardService(db, workers=config.moderation_workers, debounce_seconds=config.thread_debounce_seconds)
+        service = ScreenedService(db, workers=config.moderation_workers, debounce_seconds=config.thread_debounce_seconds)
         await service.start()
         app.state.store = db
         app.state.service = service
@@ -110,7 +110,7 @@ def create_app(config: Config | None = None, store: FirestoreDB | None = None, s
         await asyncio.gather(*tasks, return_exceptions=True)
         await service.stop()
 
-    app = FastAPI(title="SafeGuard 2.0 API", version="2.0.0", lifespan=lifespan)
+    app = FastAPI(title="Screened API", version="2.0.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.cors_origins,
@@ -119,7 +119,7 @@ def create_app(config: Config | None = None, store: FirestoreDB | None = None, s
         allow_headers=["*"],
     )
 
-    def svc(request: Request) -> SafeGuardService:
+    def svc(request: Request) -> ScreenedService:
         return request.app.state.service
 
     def require_store(request: Request) -> None:
@@ -130,14 +130,14 @@ def create_app(config: Config | None = None, store: FirestoreDB | None = None, s
 
     @app.get("/", tags=["health"])
     async def root():
-        return {"name": "SafeGuard 2.0 API", "version": "2.0.0", "docs": "/docs"}
+        return {"name": "Screened API", "version": "2.0.0", "docs": "/docs"}
 
     @app.get("/health", tags=["health"])
     async def health(request: Request):
         platforms = request.app.state.platforms
         d = platforms.get("discord")
         ig = platforms.get("instagram")
-        service: SafeGuardService = request.app.state.service
+        service: ScreenedService = request.app.state.service
         return {
             "status": "ok",
             "firestore": request.app.state.store.available,

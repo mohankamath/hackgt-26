@@ -1,4 +1,4 @@
-"""SafeGuard service: the orchestration layer between platforms, moderation, AI, and storage.
+"""Screened service: the orchestration layer between platforms, moderation, AI, and storage.
 
 Inbound flow (runs on a queue worker, never on the platform listener):
     payload -> contact lookup/creation -> moderation (text + images + avatar, concurrent)
@@ -31,10 +31,10 @@ from app.services.settings import SettingsCache
 from app.util import contact_id_for, message_doc_id, normalize_timestamp, strip_query, thread_id_for, utcnow
 from app.workers.queue import ModerationQueue
 
-log = logging.getLogger("safeguard.ingest")
+log = logging.getLogger("screened.ingest")
 
 
-class SafeGuardService:
+class ScreenedService:
     def __init__(self, store: fs.FirestoreDB, *, workers: int = 4, debounce_seconds: float = 30.0) -> None:
         self.store = store
         self.settings = SettingsCache(store)

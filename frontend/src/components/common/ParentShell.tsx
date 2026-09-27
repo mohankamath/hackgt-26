@@ -48,7 +48,7 @@ export default function ParentShell({ title, subtitle, actions, children, badges
   return (
     <div className="min-h-screen bg-bg flex">
       <nav aria-label="Parent navigation" className="fixed inset-y-0 left-0 z-30 w-[72px] bg-abyss border-r border-line flex flex-col items-center py-4 gap-1 max-md:hidden">
-        <button onClick={() => navigate('/parent-dashboard')} className="mb-4 bg-transparent border-none p-0" aria-label="SafeGuard home">
+        <button onClick={() => navigate('/parent-dashboard')} className="mb-4 bg-transparent border-none p-0" aria-label="Screened home">
           <Logo size={34} />
         </button>
         {SECTIONS.map(({ id, label, icon: Icon, badge }) => {

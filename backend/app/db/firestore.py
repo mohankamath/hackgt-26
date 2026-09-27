@@ -17,7 +17,7 @@ from typing import Any
 
 from app.config import BACKEND_DIR, Config
 
-log = logging.getLogger("safeguard.db")
+log = logging.getLogger("screened.db")
 
 MESSAGES = "messages"
 SENT_MESSAGES = "sent_messages"

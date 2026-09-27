@@ -24,7 +24,7 @@ from PIL import Image, ImageOps
 from app import policy
 from app.ai import client as ai
 
-log = logging.getLogger("safeguard.moderation.image")
+log = logging.getLogger("screened.moderation.image")
 
 # OpenAI accepts images up to 20 MB; stay a little under to leave room for encoding.
 MAX_IMAGE_BYTES = 20 * 1024 * 1024

@@ -65,7 +65,7 @@ function SettingsPage() {
   return (
     <ParentShell
       title="Settings"
-      subtitle="Tune how SafeGuard protects your family"
+      subtitle="Tune how Screened protects your family"
       actions={
         <span className="text-sm text-muted flex items-center gap-1.5" role="status">
           {saved ? (
