@@ -41,10 +41,14 @@ class Config:
     discord_token: str = ""
     discord_dms_only: bool = True
     instagram_session_id: str = ""
+    instagram_username: str = ""
+    instagram_password: str = ""
+    instagram_totp_seed: str = ""
     instagram_poll_interval: int = 30
 
     # Firebase
     firestore_credentials_path: str = ""
+    firestore_database_id: str = "(default)"
     firebase_storage_bucket: str = ""
 
     # OpenAI
@@ -68,8 +72,12 @@ class Config:
         return bool(self.discord_token)
 
     @property
+    def instagram_has_password(self) -> bool:
+        return bool(self.instagram_username and self.instagram_password)
+
+    @property
     def instagram_enabled(self) -> bool:
-        return bool(self.instagram_session_id)
+        return bool(self.instagram_session_id) or self.instagram_has_password
 
     @property
     def openai_enabled(self) -> bool:
@@ -85,8 +93,12 @@ def load_config(env_file: str | os.PathLike | None = None) -> Config:
         discord_token=env("DISCORD_TOKEN", ""),
         discord_dms_only=_bool(env("DISCORD_DMS_ONLY"), True),
         instagram_session_id=env("INSTAGRAM_SESSION_ID", ""),
+        instagram_username=env("INSTAGRAM_USERNAME", ""),
+        instagram_password=env("INSTAGRAM_PASSWORD", ""),
+        instagram_totp_seed=env("INSTAGRAM_TOTP_SEED", ""),
         instagram_poll_interval=_int(env("INSTAGRAM_POLL_INTERVAL"), 30),
         firestore_credentials_path=env("FIRESTORE_CREDENTIALS_PATH", ""),
+        firestore_database_id=env("FIRESTORE_DATABASE_ID") or "(default)",
         firebase_storage_bucket=env("FIREBASE_STORAGE_BUCKET", ""),
         openai_api_key=env("OPENAI_API_KEY", ""),
         openai_model=env("OPENAI_MODEL") or "gpt-4o-mini",

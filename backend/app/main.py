@@ -83,7 +83,14 @@ def create_app(config: Config | None = None, store: FirestoreDB | None = None, s
             try:
                 from app.platforms.instagram import InstagramPlatform
 
-                ig = InstagramPlatform(service, config.instagram_session_id, config.instagram_poll_interval)
+                ig = InstagramPlatform(
+                    service,
+                    config.instagram_session_id,
+                    config.instagram_poll_interval,
+                    username=config.instagram_username,
+                    password=config.instagram_password,
+                    totp_seed=config.instagram_totp_seed,
+                )
                 app.state.platforms["instagram"] = ig
                 tasks.append(asyncio.create_task(ig.start()))
             except ImportError as exc:
@@ -136,7 +143,13 @@ def create_app(config: Config | None = None, store: FirestoreDB | None = None, s
             "firestore": request.app.state.store.available,
             "openai": {"configured": config.openai_enabled, "model": config.openai_model, "moderation_model": config.moderation_model},
             "discord": {"enabled": config.discord_enabled, "ready": bool(d and d.ready), "user": d.user if d else None, "error": d.error if d else None},
-            "instagram": {"enabled": config.instagram_enabled, "running": bool(ig and ig.is_running), "user": ig.user if ig else None, "error": ig.error if ig else None},
+            "instagram": {
+                "enabled": config.instagram_enabled,
+                "running": bool(ig and ig.is_running),
+                "user": ig.user if ig else None,
+                "login_method": ig.login_method if ig else None,
+                "error": ig.error if ig else None,
+            },
             "queue": {"size": service.queue.size, "processed": service.queue.processed, "failed": service.queue.failed},
         }
 

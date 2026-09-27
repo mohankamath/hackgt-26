@@ -2,8 +2,26 @@ import { useState } from 'react'
 import { NewspaperIcon, CircleNotchIcon, ChatTeardropTextIcon, HeartIcon, WarningIcon, SparkleIcon } from '@phosphor-icons/react'
 import { generateDigest } from '../../lib/api'
 import type { Digest } from '../../types/safety'
-import { Card } from '../common/ui'
+import { Button, Card, SectionLabel } from '../common/ui'
 import { timeAgo } from '../../lib/format'
+
+function Section({ title, items, icon, tone }: { title: string; items: string[]; icon: React.ReactNode; tone: string }) {
+  if (!items.length) return null
+  return (
+    <div>
+      <SectionLabel>
+        <span className={`inline-flex items-center gap-1 ${tone}`}>{icon}{title}</span>
+      </SectionLabel>
+      <ul className="m-0 p-0 list-none flex flex-col gap-1">
+        {items.map((x, i) => (
+          <li key={i} className="text-sm text-fg-soft pl-3 relative before:absolute before:left-0 before:top-2 before:w-1 before:h-1 before:rounded-full before:bg-line-strong">
+            {x}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
 
 export default function DigestCard({ digest }: { digest: Digest | null }) {
   const [busy, setBusy] = useState(false)
@@ -21,50 +39,52 @@ export default function DigestCard({ digest }: { digest: Digest | null }) {
     }
   }
 
-  const Section = ({ title, items, icon }: { title: string; items: string[]; icon: React.ReactNode }) =>
-    items.length ? (
-      <div>
-        <p className="text-[0.7rem] font-bold uppercase tracking-wide text-ink-black-400 m-0 mb-1 flex items-center gap-1">{icon}{title}</p>
-        <ul className="m-0 pl-4 text-sm text-ink-black-700 flex flex-col gap-0.5">
-          {items.map((x, i) => <li key={i}>{x}</li>)}
-        </ul>
-      </div>
-    ) : null
-
   return (
     <Card
       title="Weekly digest"
-      icon={<NewspaperIcon size={18} weight="bold" className="text-spicy-orange-500" aria-hidden />}
+      subtitle={digest ? `Generated ${timeAgo(digest.created_at?.toMillis?.() ?? 0)}` : 'AI summary of the week'}
+      icon={<NewspaperIcon size={18} weight="duotone" className="text-ai" aria-hidden />}
       action={
-        <button onClick={generate} disabled={busy} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border-none cursor-pointer bg-spicy-orange-500 text-white hover:bg-spicy-orange-600 disabled:opacity-50">
-          {busy ? <CircleNotchIcon size={12} className="animate-spin" /> : <SparkleIcon size={12} weight="fill" aria-hidden />}
+        <Button size="sm" variant="primary" onClick={generate} disabled={busy}>
+          {busy ? <CircleNotchIcon size={13} className="animate-spin" /> : <SparkleIcon size={13} weight="fill" aria-hidden />}
           {digest ? 'Refresh' : 'Generate'}
-        </button>
+        </Button>
       }
     >
-      {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+      {error && <p className="text-xs text-danger mt-0 mb-2">{error}</p>}
       {!digest ? (
-        <p className="text-xs text-ink-black-400">
-          Get a calm, AI-written summary of the week with ideas for talking with your child. Only stats are sent to the AI, never message text.
+        <p className="text-sm text-muted m-0 leading-relaxed">
+          A calm summary of the week with ideas for talking with your child. Only stats go to the AI, never message text.
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
-          <p className="text-base font-bold text-ink-black-800 m-0">{digest.headline}</p>
+        <div className="flex flex-col gap-4">
+          <p className="font-display text-lg font-semibold text-fg m-0 leading-snug">{digest.headline}</p>
           {digest.stats && (
-            <p className="text-xs text-ink-black-400 m-0">
-              {digest.stats.messages_received} received · {digest.stats.messages_sent} sent · {digest.stats.safe_rate}% safe · {timeAgo(digest.created_at?.toMillis?.() ?? 0)}
-            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                ['Received', digest.stats.messages_received],
+                ['Sent', digest.stats.messages_sent],
+                ['Safe', `${digest.stats.safe_rate}%`],
+              ].map(([k, v]) => (
+                <div key={k} className="rounded-lg bg-surface-2 ring-1 ring-line px-3 py-2">
+                  <p className="text-[0.65rem] text-subtle m-0 uppercase tracking-wider">{k}</p>
+                  <p className="font-display text-lg font-semibold text-fg m-0 tabular-nums">{v}</p>
+                </div>
+              ))}
+            </div>
           )}
-          <Section title="Highlights" items={digest.highlights} icon={<SparkleIcon size={12} aria-hidden />} />
-          <Section title="Worth a look" items={digest.concerns} icon={<WarningIcon size={12} aria-hidden />} />
-          <Section title="Healthy connections" items={digest.positive_connections} icon={<HeartIcon size={12} aria-hidden />} />
+          <Section title="Highlights" items={digest.highlights} icon={<SparkleIcon size={11} aria-hidden />} tone="text-accent" />
+          <Section title="Worth a look" items={digest.concerns} icon={<WarningIcon size={11} aria-hidden />} tone="text-alert" />
+          <Section title="Healthy connections" items={digest.positive_connections} icon={<HeartIcon size={11} aria-hidden />} tone="text-ok" />
           {!!digest.conversation_starters.length && (
-            <div className="bg-soft-peach-50 rounded-xl p-3">
-              <p className="text-[0.7rem] font-bold uppercase tracking-wide text-carrot-orange-700 m-0 mb-1 flex items-center gap-1">
-                <ChatTeardropTextIcon size={12} weight="fill" aria-hidden /> Conversation starters
-              </p>
+            <div className="rounded-xl bg-gradient-to-br from-ai/15 to-accent-2/10 ring-1 ring-ai/25 p-4">
+              <SectionLabel>
+                <span className="inline-flex items-center gap-1 text-ai">
+                  <ChatTeardropTextIcon size={12} weight="fill" aria-hidden /> Conversation starters
+                </span>
+              </SectionLabel>
               {digest.conversation_starters.map((q, i) => (
-                <p key={i} className="text-sm text-ink-black-700 m-0 mt-1">“{q}”</p>
+                <p key={i} className="text-sm text-fg m-0 mt-1.5 leading-relaxed">“{q}”</p>
               ))}
             </div>
           )}

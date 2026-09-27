@@ -33,7 +33,7 @@ if not firebase_admin._apps:
     else:
         firebase_admin.initialize_app()
 
-db = firestore.client()
+db = firestore.client(database_id=load_config().firestore_database_id)
 
 BACKUP_DIR = os.path.join(os.path.dirname(__file__), "..", "backups")
 

@@ -23,7 +23,8 @@ function ChildChat() {
   const { pending, statusOf } = useContacts()
   const { byId: threadsById } = useThreads()
   const { settings } = useSettings()
-  const childName = settings.childName || 'Me'
+  // "Your child" is the parent-facing default; the kid sees a friendlier fallback.
+  const childName = settings.childName && settings.childName !== 'Your child' ? settings.childName : 'friend'
   const childAvatar = settings.childAvatar || happyDog
 
   // Visibility is decided by the backend (pending / blocked senders are never visible).
@@ -57,7 +58,7 @@ function ChildChat() {
       : null
 
   return (
-    <div className="flex h-screen bg-soft-peach-50">
+    <div className="flex h-screen bg-bg">
       <ChatSidebar
         channels={channels}
         selectedChannel={selectedChannel}
@@ -70,17 +71,18 @@ function ChildChat() {
         childAvatar={childAvatar}
       />
 
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 bg-aurora relative">
+        <div className="absolute inset-0 bg-grid pointer-events-none" aria-hidden />
         {selectedChannel ? (
           <>
-            <header className="bg-white px-5 py-3 flex items-center gap-3 border-b border-rust-brown-100">
-              <button className="hidden max-md:flex bg-transparent border-none cursor-pointer p-1 text-ink-black-700" aria-label="Open chats" onClick={() => setSidebarOpen(true)}>
-                <ListIcon size={24} weight="bold" />
+            <header className="relative z-10 h-16 px-5 flex items-center gap-3 border-b border-line bg-bg/70 backdrop-blur-xl">
+              <button className="hidden max-md:flex bg-transparent border-none p-1 text-fg-soft" aria-label="Open chats" onClick={() => setSidebarOpen(true)}>
+                <ListIcon size={22} />
               </button>
-              <ChannelAvatar channel={selectedChannel} size={40} />
+              <ChannelAvatar channel={selectedChannel} size={38} />
               <div className="flex flex-col min-w-0">
-                <h3 className="text-lg font-bold text-ink-black-800 leading-tight truncate">{selectedChannel.channel_name}</h3>
-                <span className="text-xs text-ink-black-400">
+                <h2 className="text-base font-semibold text-fg m-0 truncate">{selectedChannel.channel_name}</h2>
+                <span className="text-xs text-muted">
                   {displayPlatform(selectedChannel.platform)}
                   {selectedChannel.isGroupChat && ` · ${selectedChannel.profilePictures.length + 1} members`}
                 </span>
@@ -88,31 +90,43 @@ function ChildChat() {
             </header>
 
             {showTip && (
-              <div className="bg-sky-50 border-b border-sky-200 px-5 py-2.5 flex items-start gap-2" role="note">
-                <LightbulbIcon size={18} weight="fill" className="text-sky-500 shrink-0 mt-0.5" aria-hidden />
-                <p className="text-sm text-sky-900 m-0">{thread!.child_tip}</p>
+              <div className="relative z-10 mx-5 mt-4 rounded-xl bg-accent-2/10 ring-1 ring-accent-2/25 px-4 py-3 flex items-start gap-2.5 animate-rise" role="note">
+                <LightbulbIcon size={18} weight="fill" className="text-accent-2 shrink-0 mt-0.5" aria-hidden />
+                <p className="text-sm text-fg-soft m-0">{thread!.child_tip}</p>
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-2" aria-live="polite">
-              {currentMessages.map((msg) => (
-                <ChatBubble key={msg.id ?? msg.message_id} msg={msg} onImageClick={setLightboxUrl} childName={childName} childAvatar={childAvatar} />
-              ))}
+            <div className="relative z-10 flex-1 overflow-y-auto px-5 py-6 flex flex-col gap-4" aria-live="polite">
+              {currentMessages.map((msg, i) => {
+                const prev = currentMessages[i - 1]
+                const grouped =
+                  !!prev &&
+                  !!prev.is_sent === !!msg.is_sent &&
+                  prev.user_id === msg.user_id &&
+                  (msg.timestamp?.toMillis?.() ?? 0) - (prev.timestamp?.toMillis?.() ?? 0) < 5 * 60_000
+                return (
+                  <ChatBubble key={msg.id ?? msg.message_id} msg={msg} onImageClick={setLightboxUrl} childName={childName} childAvatar={childAvatar} grouped={grouped} />
+                )
+              })}
               <div ref={messagesEndRef} />
             </div>
 
-            <MessageInput channelId={selectedChannel.channel_id} platform={selectedChannel.platform} disabledReason={disabledReason} />
+            <div className="relative z-10">
+              <MessageInput channelId={selectedChannel.channel_id} platform={selectedChannel.platform} disabledReason={disabledReason} />
+            </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-ink-black-300 gap-2">
-            <button className="hidden max-md:flex bg-transparent border-none cursor-pointer p-1 text-ink-black-700 absolute top-4 left-4" aria-label="Open chats" onClick={() => setSidebarOpen(true)}>
-              <ListIcon size={24} weight="bold" />
+          <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
+            <button className="hidden max-md:flex bg-transparent border-none p-1 text-fg-soft absolute top-4 left-4" aria-label="Open chats" onClick={() => setSidebarOpen(true)}>
+              <ListIcon size={22} />
             </button>
-            <div className="animate-bounce-slow">
-              <ChatCircleDotsIcon size={64} weight="duotone" className="text-carrot-orange-400" aria-hidden />
+            <div className="animate-float w-20 h-20 rounded-3xl bg-surface-2 ring-1 ring-line flex items-center justify-center shadow-glow">
+              <ChatCircleDotsIcon size={40} weight="duotone" className="text-accent" aria-hidden />
             </div>
-            <h2 className="text-2xl font-bold text-ink-black-500">Hi {childName}! Pick a chat.</h2>
-            <p>Select a conversation from the sidebar to start chatting.</p>
+            <h2 className="text-3xl font-bold m-0 mt-3">
+              Hi <span className="text-gradient">{childName}</span>!
+            </h2>
+            <p className="text-muted m-0">Pick a chat on the left to start talking.</p>
           </div>
         )}
       </main>

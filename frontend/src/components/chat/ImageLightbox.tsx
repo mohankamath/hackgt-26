@@ -16,22 +16,16 @@ export default function ImageLightbox({ url, onClose }: ImageLightboxProps) {
   }, [onClose])
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
-      onClick={onClose}
-    >
+    <div role="dialog" aria-modal="true" aria-label="Image preview" className="fixed inset-0 z-50 flex items-center justify-center bg-abyss/90 backdrop-blur-md" onClick={onClose}>
       <button
+        autoFocus
         onClick={onClose}
-        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 border-none text-white flex items-center justify-center cursor-pointer transition-colors"
+        aria-label="Close"
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-surface-3 ring-1 ring-line hover:bg-line border-none text-fg flex items-center justify-center transition-colors"
       >
-        <XIcon size={22} weight="bold" />
+        <XIcon size={20} weight="bold" />
       </button>
-      <img
-        src={url}
-        alt=""
-        className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      />
+      <img src={url} alt="" className="max-w-[90vw] max-h-[90vh] object-contain rounded-2xl shadow-2xl animate-pop-in" onClick={(e) => e.stopPropagation()} />
     </div>
   )
 }

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { XIcon, EyeIcon, CircleNotchIcon, ProhibitIcon, PaperPlaneRightIcon } from '@phosphor-icons/react'
+import { XIcon, EyeIcon, CircleNotchIcon, ProhibitIcon, PaperPlaneRightIcon, CheckIcon, EyeSlashIcon, ShieldSlashIcon, IdentificationCardIcon } from '@phosphor-icons/react'
 import { reviewMessage, signedMediaUrl } from '../../lib/api'
 import { isAttachmentHidden, isImageAttachment, messageStatus, type FirestoreMessage, type MessageAttachment } from '../../types/message'
 import type { ContactStatus } from '../../types/safety'
 import { displayPlatform } from '../../types/channel'
-import { Avatar, CategoryTags, SeverityBadge, StatusBadge } from '../common/ui'
+import { Avatar, Button, CategoryTags, SectionLabel, SeverityBadge, StatusBadge } from '../common/ui'
 import { formatDateTime } from '../../lib/format'
 
 interface Props {
@@ -33,25 +33,25 @@ function ReviewAttachment({ a }: { a: MessageAttachment }) {
   }
 
   return (
-    <div className="rounded-xl border border-ink-black-100 p-2">
+    <div className="rounded-xl bg-surface-2 ring-1 ring-line p-3">
       <div className="flex items-center gap-2 mb-2 flex-wrap">
-        <span className="text-xs font-semibold text-ink-black-600 truncate">{a.filename}</span>
+        <span className="text-xs font-medium text-fg-soft truncate">{a.filename}</span>
         {a.status && <StatusBadge status={a.status} />}
         <CategoryTags categories={a.categories} />
-        {a.error && <span className="text-[0.65rem] text-violet-600">{a.error}</span>}
       </div>
+      {a.error && <p className="text-[0.7rem] text-review m-0 mb-2">{a.error}</p>}
       {url && revealed ? (
         isImageAttachment(a) ? (
-          <img src={url} alt={a.filename} className={`rounded-lg max-h-72 max-w-full object-contain ${hidden ? 'blur-xl hover:blur-none transition-[filter]' : ''}`} />
+          <img src={url} alt={a.filename} className={`rounded-lg max-h-72 max-w-full object-contain ${hidden ? 'blur-xl hover:blur-none transition-[filter] duration-300' : ''}`} />
         ) : (
-          <a href={url} target="_blank" rel="noreferrer" className="text-sm underline">Open {a.kind ?? 'file'}</a>
+          <a href={url} target="_blank" rel="noreferrer" className="text-sm text-accent underline">Open {a.kind ?? 'file'}</a>
         )
       ) : (
-        <button onClick={reveal} className="flex items-center gap-1.5 text-xs font-semibold bg-ink-black-50 hover:bg-ink-black-100 border-none rounded-lg px-3 py-2 cursor-pointer text-ink-black-600">
-          <EyeIcon size={14} weight="bold" aria-hidden /> Load for review (shown blurred, hover to view)
-        </button>
+        <Button size="sm" onClick={reveal}>
+          <EyeIcon size={14} aria-hidden /> Load for review (blurred; hover to view)
+        </Button>
       )}
-      {err && <p className="text-xs text-red-600 mt-1 mb-0">{err}</p>}
+      {err && <p className="text-xs text-danger mt-1.5 mb-0">{err}</p>}
     </div>
   )
 }
@@ -79,119 +79,132 @@ export default function MessageReviewDrawer({ msg, contactStatus, onClose, onSet
     }
   }
 
-  const override = (s: 'safe' | 'masked' | 'censored') =>
-    act(s, () => reviewMessage(msg.collection ?? 'messages', msg.id!, s))
-
+  const override = (s: 'safe' | 'masked' | 'censored') => act(s, () => reviewMessage(msg.collection ?? 'messages', msg.id!, s))
   const scores = Object.entries(msg.moderation?.scores ?? {}).filter(([, v]) => v >= 0.01)
 
+  const decisions = [
+    { s: 'safe' as const, label: 'Show to child', icon: CheckIcon, variant: 'ok' as const },
+    { s: 'masked' as const, label: 'Mask words', icon: EyeSlashIcon, variant: 'warn' as const },
+    { s: 'censored' as const, label: 'Hide', icon: ShieldSlashIcon, variant: 'danger' as const },
+  ]
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm" onClick={onClose}>
-      <aside role="dialog" aria-modal="true" aria-labelledby="drawer-title" className="bg-white w-full max-w-md h-full overflow-y-auto shadow-2xl p-6 animate-pop-in" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-3 mb-4">
+    <div className="fixed inset-0 z-50 flex justify-end bg-abyss/70 backdrop-blur-sm" onClick={onClose}>
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="drawer-title"
+        className="bg-surface border-l border-line w-full max-w-md h-full overflow-y-auto shadow-2xl flex flex-col animate-[rise_0.25s_ease-out]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="sticky top-0 z-10 bg-surface/95 backdrop-blur-xl border-b border-line px-6 py-4 flex items-center gap-3">
           <Avatar src={msg.is_sent ? null : msg.profile_picture} size={40} />
           <div className="flex-1 min-w-0">
-            <h3 id="drawer-title" className="text-lg font-bold text-ink-black-800 m-0 truncate">{msg.is_sent ? 'Sent by your child' : msg.username}</h3>
-            <p className="text-xs text-ink-black-400 m-0">
+            <h3 id="drawer-title" className="text-base font-semibold m-0 truncate">{msg.is_sent ? 'Sent by your child' : msg.username}</h3>
+            <p className="text-xs text-muted m-0 truncate">
               {displayPlatform(msg.platform)} · {msg.channel_name} · {formatDateTime(msg.timestamp?.toMillis?.() ?? 0)}
             </p>
           </div>
-          <button autoFocus onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-full bg-soft-peach-50 hover:bg-soft-peach-100 border-none flex items-center justify-center cursor-pointer">
-            <XIcon size={18} weight="bold" />
+          <button autoFocus onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-lg bg-surface-2 ring-1 ring-line hover:bg-surface-3 border-none text-fg-soft flex items-center justify-center">
+            <XIcon size={16} />
           </button>
-        </div>
+        </header>
 
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <StatusBadge status={status} />
-          <SeverityBadge severity={msg.severity} />
-          {msg.reviewed_by_parent && <span className="text-[0.65rem] text-ink-black-400">reviewed by you</span>}
-          {msg.profile_picture_flagged && <span className="text-[0.65rem] font-semibold text-red-600">flagged profile picture</span>}
-        </div>
+        <div className="px-6 py-5 flex flex-col gap-5 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={status} />
+            <SeverityBadge severity={msg.severity} />
+            {msg.reviewed_by_parent && <span className="text-[0.7rem] text-subtle">reviewed by you</span>}
+            {msg.profile_picture_flagged && <span className="text-[0.7rem] text-danger">flagged profile picture</span>}
+          </div>
 
-        <div className="bg-soft-peach-50 rounded-xl p-4 mb-4">
-          <p className="text-[0.7rem] font-bold uppercase tracking-wide text-ink-black-400 m-0 mb-1">Original message</p>
-          <p className="text-sm text-ink-black-800 whitespace-pre-wrap break-words m-0">{msg.message || <em className="text-ink-black-300">(no text)</em>}</p>
+          <div>
+            <SectionLabel>Original message</SectionLabel>
+            <div className="rounded-xl bg-bg ring-1 ring-line p-4">
+              <p className="text-sm text-fg whitespace-pre-wrap break-words m-0 leading-relaxed">{msg.message || <em className="text-subtle">(no text)</em>}</p>
+            </div>
+          </div>
+
           {status === 'masked' && msg.masked_content && (
-            <>
-              <p className="text-[0.7rem] font-bold uppercase tracking-wide text-ink-black-400 mt-3 mb-1">What your child sees</p>
-              <p className="text-sm text-ink-black-700 m-0">{msg.masked_content}</p>
-            </>
+            <div>
+              <SectionLabel>What your child sees</SectionLabel>
+              <p className="text-sm text-fg-soft m-0">{msg.masked_content}</p>
+            </div>
           )}
           {msg.coach_tip && (
-            <>
-              <p className="text-[0.7rem] font-bold uppercase tracking-wide text-ink-black-400 mt-3 mb-1">Tip shown to your child</p>
-              <p className="text-sm text-ink-black-700 m-0">{msg.coach_tip}</p>
-            </>
+            <div>
+              <SectionLabel>Tip shown to your child</SectionLabel>
+              <p className="text-sm text-accent-2 m-0 leading-relaxed">{msg.coach_tip}</p>
+            </div>
+          )}
+
+          {!!msg.moderation?.reasons?.length && (
+            <div>
+              <SectionLabel>Why it was flagged</SectionLabel>
+              <ul className="m-0 p-0 list-none flex flex-col gap-1 mb-2">
+                {msg.moderation.reasons.map((r) => (
+                  <li key={r} className="text-sm text-fg-soft pl-3 relative before:absolute before:left-0 before:top-2 before:w-1 before:h-1 before:rounded-full before:bg-alert">{r}</li>
+                ))}
+              </ul>
+              <CategoryTags categories={msg.moderation.categories} max={8} />
+            </div>
+          )}
+
+          {!!msg.pii?.length && (
+            <p className="text-sm text-warn m-0 flex items-center gap-1.5">
+              <IdentificationCardIcon size={16} aria-hidden /> Possible personal info: {msg.pii.map((p) => p.label).join(', ')}
+            </p>
+          )}
+
+          {scores.length > 0 && (
+            <div>
+              <SectionLabel>OpenAI moderation scores</SectionLabel>
+              <ul className="list-none p-0 m-0 flex flex-col gap-2">
+                {scores.map(([k, v]) => (
+                  <li key={k} className="flex items-center gap-3 text-xs">
+                    <span className="w-36 text-muted truncate font-mono">{k}</span>
+                    <span className="flex-1 h-1.5 rounded-full bg-surface-3 overflow-hidden">
+                      <span className={`block h-full rounded-full ${v >= 0.5 ? 'bg-danger' : v >= 0.2 ? 'bg-alert' : 'bg-line-strong'}`} style={{ width: `${Math.round(v * 100)}%` }} />
+                    </span>
+                    <span className="w-10 text-right text-fg-soft tabular-nums">{Math.round(v * 100)}%</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {!!msg.attachments?.length && (
+            <div className="flex flex-col gap-2">
+              <SectionLabel>Attachments</SectionLabel>
+              {msg.attachments.map((a, i) => <ReviewAttachment key={i} a={a} />)}
+            </div>
+          )}
+          {msg.is_sent && (
+            <p className="text-xs text-muted m-0 flex items-center gap-1.5">
+              <PaperPlaneRightIcon size={12} aria-hidden /> Messages your child sends are never blocked, only flagged for you.
+            </p>
           )}
         </div>
 
-        {!!msg.moderation?.reasons?.length && (
-          <div className="mb-4">
-            <p className="text-[0.7rem] font-bold uppercase tracking-wide text-ink-black-400 m-0 mb-1">Why</p>
-            <ul className="m-0 pl-4 text-sm text-ink-black-700">{msg.moderation.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
-            <div className="mt-2"><CategoryTags categories={msg.moderation.categories} max={8} /></div>
-          </div>
-        )}
-        {!!msg.pii?.length && (
-          <p className="text-sm text-amber-700 mb-4">Possible personal info: {msg.pii.map((p) => p.label).join(', ')}</p>
-        )}
-
-        {scores.length > 0 && (
-          <div className="mb-4">
-            <p className="text-[0.7rem] font-bold uppercase tracking-wide text-ink-black-400 m-0 mb-2">OpenAI moderation scores</p>
-            <ul className="list-none p-0 m-0 flex flex-col gap-1.5">
-              {scores.map(([k, v]) => (
-                <li key={k} className="flex items-center gap-2 text-xs">
-                  <span className="w-40 text-ink-black-600 truncate">{k}</span>
-                  <span className="flex-1 h-1.5 rounded-full bg-ink-black-50 overflow-hidden">
-                    <span className={`block h-full rounded-full ${v >= 0.5 ? 'bg-red-500' : v >= 0.2 ? 'bg-orange-400' : 'bg-ink-black-300'}`} style={{ width: `${Math.round(v * 100)}%` }} />
-                  </span>
-                  <span className="w-10 text-right text-ink-black-500">{Math.round(v * 100)}%</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {!!msg.attachments?.length && (
-          <div className="mb-4 flex flex-col gap-2">
-            <p className="text-[0.7rem] font-bold uppercase tracking-wide text-ink-black-400 m-0">Attachments</p>
-            {msg.attachments.map((a, i) => <ReviewAttachment key={i} a={a} />)}
-          </div>
-        )}
-
         {!msg.is_sent && (
-          <div className="border-t border-soft-peach-100 pt-4 flex flex-col gap-3">
-            <p className="text-[0.7rem] font-bold uppercase tracking-wide text-ink-black-400 m-0">Your decision for this message</p>
-            <div className="flex gap-2 flex-wrap">
-              {(['safe', 'masked', 'censored'] as const).map((s) => (
-                <button
-                  key={s}
-                  disabled={!!busy || status === s}
-                  onClick={() => override(s)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border-none cursor-pointer disabled:opacity-40 ${
-                    s === 'safe' ? 'bg-green-500 text-white hover:bg-green-600' : s === 'masked' ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-red-500 text-white hover:bg-red-600'
-                  }`}
-                >
-                  {busy === s && <CircleNotchIcon size={12} className="animate-spin" />}
-                  {s === 'safe' ? 'Show to child' : s === 'masked' ? 'Mask bad words' : 'Hide from child'}
-                </button>
+          <footer className="sticky bottom-0 bg-surface/95 backdrop-blur-xl border-t border-line px-6 py-4 flex flex-col gap-3">
+            <SectionLabel>Your decision</SectionLabel>
+            <div className="grid grid-cols-3 gap-2">
+              {decisions.map(({ s, label, icon: Icon, variant }) => (
+                <Button key={s} size="sm" variant={variant} disabled={!!busy || status === s} onClick={() => override(s)}>
+                  {busy === s ? <CircleNotchIcon size={13} className="animate-spin" /> : <Icon size={13} weight="bold" aria-hidden />}
+                  {label}
+                </Button>
               ))}
             </div>
             {msg.contact_id && contactStatus !== 'blocked' && (
-              <button
-                disabled={!!busy}
-                onClick={() => act('block', () => onSetContactStatus(msg.contact_id!, 'blocked'))}
-                className="self-start flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-red-200 bg-white text-red-600 cursor-pointer hover:bg-red-50 disabled:opacity-40"
-              >
+              <Button size="sm" variant="outline-danger" disabled={!!busy} onClick={() => act('block', () => onSetContactStatus(msg.contact_id!, 'blocked'))}>
                 <ProhibitIcon size={14} weight="bold" aria-hidden /> Block {msg.username}
-              </button>
+              </Button>
             )}
-          </div>
+            {error && <p className="text-xs text-danger m-0">{error}</p>}
+          </footer>
         )}
-        {msg.is_sent && (
-          <p className="text-xs text-ink-black-400 flex items-center gap-1"><PaperPlaneRightIcon size={12} aria-hidden /> Messages your child sends are never blocked, only flagged for you.</p>
-        )}
-        {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
       </aside>
     </div>
   )

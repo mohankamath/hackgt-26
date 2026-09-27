@@ -11,6 +11,7 @@
 .env.*.local
 *firebase-adminsdk*.json
 serviceAccountKey.json
+firebase_secrets.json
 backend/instagram_session.json
 backend/backups/
 
@@ -29,3 +30,4 @@ dist-ssr/
 *.local
 *.log
 coverage/
+firebase_secrets.json

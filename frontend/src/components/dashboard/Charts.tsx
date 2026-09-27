@@ -1,39 +1,74 @@
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from 'recharts'
-import { ChartBarIcon, TagIcon } from '@phosphor-icons/react'
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { ChartLineUpIcon, TagIcon } from '@phosphor-icons/react'
 import type { ActivityDay, CategoryCount } from '../../lib/stats'
 import { Card } from '../common/ui'
 
-const COLORS = {
-  safe: '#4ade80',
+const C = {
+  safe: '#34d399',
   masked: '#fbbf24',
-  censored: '#ef4444',
-  needs_review: '#8b5cf6',
-  sent: '#f8833a',
+  censored: '#fb7185',
+  needs_review: '#c084fc',
+  sent: '#38bdf8',
+  grid: '#1f2b45',
+  tick: '#8494b2',
+}
+const SEVERITY_COLORS = { none: '#56657f', low: '#fbbf24', medium: '#fb923c', high: '#fb7185' }
+
+const tooltipProps = {
+  contentStyle: { background: '#121b2f', border: '1px solid #2c3b5c', borderRadius: 10, fontSize: 12, color: '#e8eef8' },
+  labelStyle: { color: '#c3cee2', fontWeight: 600 },
+  itemStyle: { padding: 0 },
+  cursor: { fill: 'rgb(45 212 191 / 0.06)', stroke: '#2c3b5c' },
 }
 
-const SEVERITY_COLORS = { none: '#a0aec5', low: '#fbbf24', medium: '#fb923c', high: '#ef4444' }
+const SERIES = [
+  { key: 'safe', name: 'Safe', color: C.safe },
+  { key: 'masked', name: 'Masked', color: C.masked },
+  { key: 'needs_review', name: 'Review', color: C.needs_review },
+  { key: 'censored', name: 'Hidden', color: C.censored },
+] as const
 
 export function ActivityChart({ data }: { data: ActivityDay[] }) {
   const empty = data.every((d) => d.safe + d.masked + d.censored + d.needs_review + d.sent === 0)
   return (
-    <Card title="Activity, last 7 days" icon={<ChartBarIcon size={18} weight="bold" className="text-spicy-orange-500" aria-hidden />}>
+    <Card
+      title="Activity"
+      subtitle="Messages received per day, by outcome"
+      icon={<ChartLineUpIcon size={18} weight="duotone" aria-hidden />}
+      action={
+        <ul className="hidden sm:flex gap-3 list-none m-0 p-0">
+          {[...SERIES, { key: 'sent', name: 'Sent', color: C.sent }].map((s) => (
+            <li key={s.key} className="flex items-center gap-1.5 text-[0.68rem] text-muted">
+              <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />
+              {s.name}
+            </li>
+          ))}
+        </ul>
+      }
+    >
       {empty ? (
-        <p className="text-xs text-ink-black-300 py-10 text-center">No messages this week yet.</p>
+        <p className="text-sm text-subtle py-16 text-center m-0">No messages this week yet.</p>
       ) : (
-        <div className="h-56" role="img" aria-label="Stacked bar chart of messages per day by safety status">
+        <div className="h-60" role="img" aria-label="Stacked area chart of messages per day by safety status">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eff1f5" />
-              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} />
-              <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={11} />
-              <Tooltip cursor={{ fill: '#fdf6e7' }} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="safe" name="Safe" stackId="in" fill={COLORS.safe} />
-              <Bar dataKey="masked" name="Words hidden" stackId="in" fill={COLORS.masked} />
-              <Bar dataKey="needs_review" name="Needs review" stackId="in" fill={COLORS.needs_review} />
-              <Bar dataKey="censored" name="Hidden" stackId="in" fill={COLORS.censored} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="sent" name="Sent by child" fill={COLORS.sent} radius={[4, 4, 0, 0]} />
-            </BarChart>
+            <AreaChart data={data} margin={{ top: 6, right: 6, left: -22, bottom: 0 }}>
+              <defs>
+                {[...SERIES, { key: 'sent', color: C.sent }].map((s) => (
+                  <linearGradient key={s.key} id={`g-${s.key}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={s.color} stopOpacity={0.45} />
+                    <stop offset="100%" stopColor={s.color} stopOpacity={0.02} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 6" vertical={false} stroke={C.grid} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} tick={{ fill: C.tick }} />
+              <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={11} tick={{ fill: C.tick }} />
+              <Tooltip {...tooltipProps} />
+              {SERIES.map((s) => (
+                <Area key={s.key} type="monotone" dataKey={s.key} name={s.name} stackId="in" stroke={s.color} strokeWidth={2} fill={`url(#g-${s.key})`} />
+              ))}
+              <Area type="monotone" dataKey="sent" name="Sent" stroke={C.sent} strokeWidth={2} strokeDasharray="4 4" fill="url(#g-sent)" />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       )}
@@ -43,17 +78,17 @@ export function ActivityChart({ data }: { data: ActivityDay[] }) {
 
 export function CategoryBreakdown({ data }: { data: CategoryCount[] }) {
   return (
-    <Card title="What got flagged" icon={<TagIcon size={18} weight="bold" className="text-spicy-orange-500" aria-hidden />}>
+    <Card title="What got flagged" subtitle="Moderation categories this period" icon={<TagIcon size={18} weight="duotone" aria-hidden />}>
       {data.length === 0 ? (
-        <p className="text-xs text-ink-black-300 py-10 text-center">Nothing flagged. Nice.</p>
+        <p className="text-sm text-subtle py-16 text-center m-0">Nothing flagged. Nice.</p>
       ) : (
-        <div className="h-56" role="img" aria-label={`Flag categories: ${data.map((d) => `${d.label} ${d.count}`).join(', ')}`}>
+        <div className="h-60" role="img" aria-label={`Flag categories: ${data.map((d) => `${d.label} ${d.count}`).join(', ')}`}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} layout="vertical" margin={{ top: 0, right: 12, left: 8, bottom: 0 }}>
+            <BarChart data={data} layout="vertical" margin={{ top: 0, right: 16, left: 4, bottom: 0 }} barCategoryGap={8}>
               <XAxis type="number" allowDecimals={false} hide />
-              <YAxis type="category" dataKey="label" width={130} tickLine={false} axisLine={false} fontSize={11} />
-              <Tooltip cursor={{ fill: '#fdf6e7' }} />
-              <Bar dataKey="count" name="Messages" radius={[0, 4, 4, 0]}>
+              <YAxis type="category" dataKey="label" width={138} tickLine={false} axisLine={false} fontSize={11} tick={{ fill: C.tick }} />
+              <Tooltip {...tooltipProps} />
+              <Bar dataKey="count" name="Messages" radius={[0, 6, 6, 0]} background={{ fill: '#121b2f', radius: 6 }}>
                 {data.map((d) => (
                   <Cell key={d.category} fill={SEVERITY_COLORS[d.severity]} />
                 ))}

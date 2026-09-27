@@ -62,7 +62,7 @@ class FirestoreDB:
                     firebase_admin.initialize_app(credentials.Certificate(cred_path), options)
                 else:
                     firebase_admin.initialize_app(options=options or None)
-            self.db = firestore.client()
+            self.db = firestore.client(database_id=config.firestore_database_id)
             if config.firebase_storage_bucket:
                 try:
                     self.bucket = storage.bucket()

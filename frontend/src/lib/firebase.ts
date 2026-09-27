@@ -11,5 +11,7 @@ const firebaseConfig = {
 }
 
 const app = initializeApp(firebaseConfig)
-export const db = getFirestore(app)
+// Must match the backend's FIRESTORE_DATABASE_ID when the database isn't named "(default)".
+const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID || '(default)'
+export const db = getFirestore(app, databaseId)
 export default app
