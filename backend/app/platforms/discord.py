@@ -10,14 +10,28 @@ Changes from the original:
 from __future__ import annotations
 
 import logging
+import mimetypes
+import re
+import ssl
+from html import unescape
+from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
+import aiohttp
+import certifi
 import discord
 
 if TYPE_CHECKING:
     from app.services.ingest import ScreenedService
 
 log = logging.getLogger("screened.discord")
+_LINK_RE = re.compile(r"https?://[^\s<>]+", re.IGNORECASE)
+_PREVIEW_HOSTS = {"klipy.com", "www.klipy.com", "giphy.com", "www.giphy.com", "tenor.com", "www.tenor.com"}
+_OG_IMAGE_RE = re.compile(
+    r'<meta[^>]+(?:property|name)=["\'](?:og:image|twitter:image)["\'][^>]+content=["\']([^"\']+)',
+    re.IGNORECASE,
+)
 
 
 def _avatar_url(user) -> str | None:
@@ -76,7 +90,9 @@ class DiscordPlatform:
                     return  # outgoing messages are recorded by send_message()
                 if self.dms_only and message.guild is not None:
                     return
-                await self.service.submit(self.build_payload(message))
+                payload = self.build_payload(message)
+                await self._add_link_previews(payload)
+                await self.service.submit(payload)
             except Exception:
                 log.exception("failed to queue Discord message")
 
@@ -84,6 +100,34 @@ class DiscordPlatform:
         channel = message.channel
         is_dm = message.guild is None
         recipients = getattr(channel, "recipients", None) or []
+        attachments = []
+        for index, attachment in enumerate(message.attachments):
+            content_type = attachment.content_type or mimetypes.guess_type(attachment.filename)[0] or ""
+            attachments.append(
+                {
+                    "url": attachment.url,
+                    "filename": attachment.filename,
+                    "type": content_type,
+                    "storage_path": f"discord_media/{message.id}_{index}{Path(attachment.filename).suffix.lower() or '.bin'}",
+                }
+            )
+        known_urls = {item["url"] for item in attachments}
+        for embed_index, embed in enumerate(getattr(message, "embeds", ()) or (), start=len(attachments)):
+            preview = getattr(embed, "image", None) or getattr(embed, "thumbnail", None)
+            preview_url = str(getattr(preview, "url", "") or "") if preview else ""
+            if not preview_url or preview_url in known_urls:
+                continue
+            suffix = Path(urlparse(preview_url).path).suffix.lower()
+            content_type = mimetypes.guess_type(suffix)[0] or "image/jpeg"
+            attachments.append(
+                {
+                    "url": preview_url,
+                    "filename": f"discord-embed-{message.id}-{embed_index}{suffix or '.jpg'}",
+                    "type": content_type,
+                    "storage_path": f"discord_media/{message.id}_{embed_index}{suffix or '.jpg'}",
+                }
+            )
+            known_urls.add(preview_url)
         return {
             "platform": "discord",
             "message_id": str(message.id),
@@ -96,11 +140,50 @@ class DiscordPlatform:
             "is_group": (not is_dm) or len(recipients) > 1,
             "text": message.content or "",
             "timestamp": message.created_at,
-            "attachments": [
-                {"url": a.url, "filename": a.filename, "type": a.content_type or ""} for a in message.attachments
-            ],
+            "attachments": attachments,
             "profile_picture_url": _avatar_url(message.author),
         }
+
+    async def _add_link_previews(self, payload: dict) -> None:
+        urls = _LINK_RE.findall(payload.get("text") or "")
+        if not urls:
+            return
+        existing = {a.get("url") for a in payload["attachments"]}
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        try:
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=8),
+                connector=aiohttp.TCPConnector(ssl=ssl_context),
+            ) as session:
+                for index, raw_url in enumerate(urls[:3], start=len(payload["attachments"])):
+                    clean_url = raw_url.rstrip(".,)")
+                    host = (urlparse(clean_url).hostname or "").lower()
+                    if host not in _PREVIEW_HOSTS or clean_url in existing:
+                        continue
+                    try:
+                        async with session.get(clean_url, allow_redirects=True) as response:
+                            if response.status != 200:
+                                continue
+                            html = await response.text(errors="ignore")
+                        match = _OG_IMAGE_RE.search(html)
+                        preview_url = unescape(match.group(1)) if match else ""
+                        if not preview_url or preview_url in existing:
+                            continue
+                        suffix = Path(urlparse(preview_url).path).suffix.lower()
+                        content_type = mimetypes.guess_type(suffix)[0] or "image/jpeg"
+                        payload["attachments"].append(
+                            {
+                                "url": preview_url,
+                                "filename": f"link-preview-{payload['message_id']}-{index}{suffix or '.jpg'}",
+                                "type": content_type,
+                                "storage_path": f"discord_media/{payload['message_id']}_{index}{suffix or '.jpg'}",
+                            }
+                        )
+                        existing.add(preview_url)
+                    except Exception as exc:
+                        log.debug("could not resolve Discord link preview %s: %s", clean_url, exc)
+        except Exception as exc:
+            log.debug("Discord link preview session failed: %s", exc)
 
     async def start(self) -> None:
         try:

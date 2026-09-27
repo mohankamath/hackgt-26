@@ -88,10 +88,16 @@ export function isVisibleToChild(m: FirestoreMessage): boolean {
 }
 
 export const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg|bmp|avif)(\?|$)/i
+export const VIDEO_EXTENSIONS = /\.(mp4|mov|webm|mkv|avi|m4v)(\?|$)/i
 
 export function isImageAttachment(a: Pick<MessageAttachment, 'url' | 'type' | 'kind' | 'filename'>): boolean {
   if (a.kind) return a.kind === 'image'
   return !!a.type?.startsWith('image/') || IMAGE_EXTENSIONS.test(a.url ?? a.filename ?? '')
+}
+
+export function isVideoAttachment(a: Pick<MessageAttachment, 'url' | 'type' | 'kind' | 'filename'>): boolean {
+  if (a.kind) return a.kind === 'video'
+  return !!a.type?.startsWith('video/') || VIDEO_EXTENSIONS.test(a.url ?? a.filename ?? '')
 }
 
 export function isAttachmentHidden(a: MessageAttachment): boolean {

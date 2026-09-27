@@ -156,6 +156,8 @@ class FakeAI:
         self.moderation_rules: list[tuple[str, dict]] = []  # (substring, scores)
         self.image_scores: dict = {}
         self.moderation_error = False
+        self.visual_decision = {"allow": True, "labels": [], "reason": "safe"}
+        self.visual_calls: list[list[str]] = []
         self.completions: dict[str, object] = {}  # schema_name -> dict | Exception | callable
         self.calls: list[dict] = []
 
@@ -183,11 +185,16 @@ class FakeAI:
             raise ai.AIError(f"no scripted completion for {schema_name}")
         return copy.deepcopy(value)
 
+    async def inspect_images(self, image_urls):
+        self.visual_calls.append(image_urls)
+        return copy.deepcopy(self.visual_decision)
+
 
 @pytest.fixture
 def fake_ai(monkeypatch):
     f = FakeAI()
     monkeypatch.setattr(ai, "moderate", f.moderate)
+    monkeypatch.setattr(ai, "inspect_images", f.inspect_images)
     monkeypatch.setattr(ai, "structured_completion", f.structured_completion)
     coach.clear_cache()
     yield f

@@ -1,5 +1,5 @@
 import { ShieldCheckIcon, HourglassMediumIcon, EyeSlashIcon, ImageBrokenIcon, VideoIcon, LightbulbIcon } from '@phosphor-icons/react'
-import { isAttachmentHidden, isImageAttachment, messageStatus, type FirestoreMessage, type MessageAttachment } from '../../types/message'
+import { isAttachmentHidden, isImageAttachment, isVideoAttachment, messageStatus, type FirestoreMessage, type MessageAttachment } from '../../types/message'
 import { Avatar } from '../common/ui'
 
 interface ChatBubbleProps {
@@ -39,6 +39,8 @@ function Attachments({ items, onImageClick }: { items?: MessageAttachment[]; onI
           <button key={i} type="button" onClick={() => onImageClick(a.url!)} className="p-0 border-none bg-transparent cursor-zoom-in">
             <img src={a.url!} alt={a.filename || 'Image'} className="rounded-xl max-w-full max-h-72 object-contain hover:opacity-90 transition-opacity" />
           </button>
+        ) : isVideoAttachment(a) ? (
+          <video key={i} src={a.url!} controls preload="metadata" className="rounded-xl max-w-full max-h-72" aria-label={a.filename || 'Video'} />
         ) : (
           <a key={i} href={a.url!} target="_blank" rel="noreferrer" className="text-sm underline break-all">
             {a.filename}

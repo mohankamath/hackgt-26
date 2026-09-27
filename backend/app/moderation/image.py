@@ -17,8 +17,10 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import ssl
 
 import aiohttp
+import certifi
 from PIL import Image, ImageOps
 
 from app import policy
@@ -105,21 +107,74 @@ async def check_image_bytes(image_bytes: bytes, sensitivity: str = policy.DEFAUL
     if not image_bytes:
         return _result("needs_review", error="empty image")
     try:
-        prepared, mime = prepare_image(image_bytes)
-    except ValueError as exc:
-        return _result("needs_review", error=str(exc))
+        source = Image.open(io.BytesIO(image_bytes))
+        frame_count = getattr(source, "n_frames", 1)
+        if frame_count > 1:
+            # A harmful frame can be hidden in an otherwise harmless animation. Sample
+            # evenly across the animation while keeping API cost bounded.
+            indexes = sorted({round(i * (frame_count - 1) / 5) for i in range(min(frame_count, 6))})
+            frame_bytes = []
+            for index in indexes:
+                source.seek(index)
+                frame = source.convert("RGBA")
+                buf = io.BytesIO()
+                frame.save(buf, format="PNG", optimize=True)
+                frame_bytes.append(buf.getvalue())
+        else:
+            frame_bytes = [image_bytes]
+    except Exception as exc:
+        return _result("needs_review", error=f"not a decodable image: {exc}")
 
     try:
-        mod = await ai.moderate(
-            [{"type": "image_url", "image_url": {"url": to_data_url(prepared, mime)}}]
-        )
-    except ai.AIError as exc:
+        inputs = []
+        for frame in frame_bytes:
+            prepared, mime = prepare_image(frame)
+            inputs.append({"type": "image_url", "image_url": {"url": to_data_url(prepared, mime)}})
+        # Send sampled frames together so an animation costs one moderation request,
+        # rather than one sequential request per frame.
+        mod = await ai.moderate(inputs)
+    except (ValueError, ai.AIError) as exc:
         log.warning("image moderation failed: %s", exc)
         return _result("needs_review", error=str(exc))
 
-    scores = {k: v for k, v in mod["scores"].items() if k in policy.IMAGE_CATEGORIES}
+    raw_scores = mod.get("scores") or {}
+    scores = {k: v for k, v in raw_scores.items() if k in policy.IMAGE_CATEGORIES}
+
     verdict = policy.evaluate_scores(scores, sensitivity, allowed_categories=policy.IMAGE_CATEGORIES)
-    status = "censored" if verdict["censor"] else "safe"
+    # Honor the model's image flag even when a category score is below our display
+    # threshold, while ignoring unrelated text-only flags in test/mixed responses.
+    applied_types = mod.get("applied_input_types") or {}
+    image_was_applied = any("image" in values for values in applied_types.values())
+    flagged_categories = mod.get("categories") or {}
+    image_category_flagged = any(flagged_categories.get(category) for category in policy.IMAGE_CATEGORIES)
+    image_model_flagged = bool(mod.get("flagged")) and (image_was_applied or image_category_flagged)
+    if image_model_flagged or verdict["censor"]:
+        return _result(
+            "censored",
+            hits=verdict["hits"],
+            scores=policy.top_scores(scores, n=4),
+            severity=verdict["severity"],
+        )
+
+    inspect = getattr(ai, "inspect_images", None)
+    if inspect is None:
+        return _result("needs_review", error="image safety inspector is unavailable")
+    try:
+        inspection = await inspect([item["image_url"]["url"] for item in inputs])
+    except ai.AIError as exc:
+        log.warning("image safety inspection failed: %s", exc)
+        return _result("needs_review", error=str(exc))
+    if not inspection.get("allow"):
+        labels = ", ".join(inspection.get("labels") or []) or "visual safety concern"
+        return _result(
+            "censored",
+            hits=[{"category": "visual_safety", "label": labels, "score": 1.0, "severity": "high"}],
+            scores=policy.top_scores(scores, n=4),
+            severity="high",
+            error=inspection.get("reason") or labels,
+        )
+
+    status = "safe"
     return _result(
         status,
         hits=verdict["hits"],
@@ -131,9 +186,12 @@ async def check_image_bytes(image_bytes: bytes, sensitivity: str = policy.DEFAUL
 async def download_bytes(url: str, session: aiohttp.ClientSession | None = None) -> bytes:
     """Download a URL with a timeout and a size cap. Raises on failure."""
     own = session is None
-    session = session or aiohttp.ClientSession(
-        timeout=aiohttp.ClientTimeout(total=DOWNLOAD_TIMEOUT_SECONDS)
-    )
+    if session is None:
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=DOWNLOAD_TIMEOUT_SECONDS),
+            connector=aiohttp.TCPConnector(ssl=ssl_context),
+        )
     try:
         async with session.get(url) as resp:
             if resp.status != 200:

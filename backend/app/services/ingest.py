@@ -184,6 +184,7 @@ class ScreenedService:
             flagged = v["status"] == "censored"
             data = v.pop("_bytes", None)
             url = att.get("url")
+            review_url = att.get("review_url")
             storage_path = att.get("storage_path")
             if storage_path and data is not None:
                 try:
@@ -193,13 +194,15 @@ class ScreenedService:
                     url = public_url if public_url else (url if not flagged else None)
                 except Exception as exc:
                     log.warning("media upload failed for %s: %s", storage_path, exc)
+                    if hidden := flagged or v["status"] == "needs_review":
+                        review_url = url
             elif storage_path and v["kind"] == "video":
                 storage_path = None  # videos are not re-hosted; parent reviews via the source URL
             hidden = v["status"] in ("censored", "needs_review")
             out.append(
                 {
                     "url": None if hidden else url,
-                    "review_url": url if hidden and not storage_path else None,
+                    "review_url": review_url or (url if hidden and not storage_path else None),
                     "storage_path": storage_path if hidden else None,
                     "filename": att.get("filename") or "attachment",
                     "type": att.get("type") or "",
@@ -438,11 +441,34 @@ class ScreenedService:
     async def review_message(self, collection: str, doc_id: str, status: str) -> dict:
         if collection not in (fs.MESSAGES, fs.SENT_MESSAGES):
             raise ValueError("invalid collection")
-        if status not in ("safe", "masked", "censored"):
-            raise ValueError("status must be safe, masked, or censored")
+        if status not in ("safe", "masked", "censored", "hide_image"):
+            raise ValueError("status must be safe, masked, censored, or hide_image")
         msg = await self.store.get_message(collection, doc_id)
         if msg is None:
             raise KeyError(doc_id)
+        contact = await self.store.get_contact(msg.get("contact_id")) if msg.get("contact_id") else None
+        contact_visible = contact is None or contact.get("status") in contact_rules.VISIBLE_STATUSES
+        if status == "hide_image":
+            text_risk = bool(msg.get("flagged_words")) or any(
+                category.get("source") == "text" for category in (msg.get("moderation") or {}).get("categories", [])
+            )
+            text_status = "masked" if text_risk and msg.get("masked_content") else ("censored" if text_risk else "safe")
+            atts = []
+            for attachment in msg.get("attachments") or []:
+                if pipeline.attachment_kind(attachment) == "image":
+                    attachment = {**attachment, "url": None, "status": "censored", "flagged": True}
+                atts.append(attachment)
+            patch = {
+                "status": text_status,
+                "censored": text_status == "censored",
+                "visible_to_child": contact_visible and text_status != "censored",
+                "reviewed_by_parent": True,
+                "reviewed_at": utcnow(),
+                "attachments": atts,
+                "coach_tip": None,
+            }
+            await self.store.update_message(collection, doc_id, patch)
+            return {"doc_id": doc_id, **{k: v for k, v in patch.items() if k != "reviewed_at"}}
         patch: dict = {"status": status, "censored": status == "censored", "reviewed_by_parent": True, "reviewed_at": utcnow()}
         if status == "masked" and not msg.get("masked_content"):
             settings = await self.settings.get()
@@ -459,6 +485,8 @@ class ScreenedService:
                 atts.append(a)
             patch["attachments"] = atts
             patch["coach_tip"] = None
+            if contact is not None:
+                patch["visible_to_child"] = contact_visible
         await self.store.update_message(collection, doc_id, patch)
         return {"doc_id": doc_id, **{k: v for k, v in patch.items() if k != "reviewed_at"}}
 

@@ -82,17 +82,81 @@ async def moderate(inputs: list[dict[str, Any]]) -> dict[str, Any]:
 
     if not resp.results:
         raise AIError("moderation returned no results")
-    result = resp.results[0]
+    results = resp.results
+    category_scores = {}
+    categories = {}
+    applied_input_types = {}
+    for result in results:
+        for name, score in result.category_scores.model_dump(by_alias=True).items():
+            category_scores[name] = max(category_scores.get(name, 0.0), float(score or 0.0))
+        for name, flagged in result.categories.model_dump(by_alias=True).items():
+            categories[name] = categories.get(name, False) or bool(flagged)
+        input_types = getattr(result, "category_applied_input_types", None)
+        if input_types:
+            for name, values in input_types.model_dump(by_alias=True).items():
+                applied_input_types[name] = sorted(set(applied_input_types.get(name, [])) | set(values or []))
     return {
-        "flagged": bool(result.flagged),
-        "categories": result.categories.model_dump(by_alias=True),
-        "scores": result.category_scores.model_dump(by_alias=True),
-        "applied_input_types": (
-            result.category_applied_input_types.model_dump(by_alias=True)
-            if getattr(result, "category_applied_input_types", None)
-            else {}
-        ),
+        "flagged": any(bool(result.flagged) for result in results),
+        "categories": categories,
+        "scores": category_scores,
+        "applied_input_types": applied_input_types,
     }
+
+
+async def inspect_images(image_urls: list[str]) -> dict[str, Any]:
+    """Classify whether image inputs are appropriate for a child to see.
+
+    This complements moderation categories with visual concepts such as firearms,
+    weapons, and graphic injury that are not guaranteed to cross a moderation score.
+    """
+    schema = {
+        "type": "object",
+        "properties": {
+            "allow": {"type": "boolean"},
+            "labels": {"type": "array", "items": {"type": "string"}},
+            "reason": {"type": "string"},
+        },
+        "required": ["allow", "labels", "reason"],
+        "additionalProperties": False,
+    }
+    content: list[dict[str, Any]] = [
+        {
+            "type": "text",
+            "text": (
+                "Review these images for a child-safety inbox. Set allow=true only when every image is clearly "
+                "appropriate for a child. Set allow=false for nudity or sexual content, firearms or weapons, "
+                "graphic injury/gore, self-harm, drug use, or anything uncertain. Ordinary people, animals, "
+                "landscapes, food, and non-graphic everyday scenes may be allowed."
+            ),
+        }
+    ]
+    content.extend({"type": "image_url", "image_url": {"url": url}} for url in image_urls)
+    try:
+        resp = await get_client().chat.completions.create(
+            model=chat_model(),
+            messages=[{"role": "user", "content": content}],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {"name": "child_image_safety", "strict": True, "schema": schema},
+            },
+            temperature=0,
+            max_completion_tokens=200,
+        )
+    except AIError:
+        raise
+    except Exception as exc:
+        raise AIError(f"image safety inspection failed: {exc}") from exc
+    choice = resp.choices[0] if resp.choices else None
+    output = choice.message.content if choice and choice.message else None
+    if not output:
+        raise AIError("image safety inspection returned no result")
+    try:
+        result = json.loads(output)
+    except json.JSONDecodeError as exc:
+        raise AIError(f"image safety inspection was not valid JSON: {exc}") from exc
+    if not isinstance(result, dict) or not isinstance(result.get("allow"), bool):
+        raise AIError("image safety inspection returned an invalid result")
+    return result
 
 
 async def structured_completion(

@@ -78,7 +78,7 @@ export function generateDigest(days = 7) {
   return post<unknown>('/digest/generate', { days })
 }
 
-export function reviewMessage(collection: string, docId: string, status: 'safe' | 'masked' | 'censored') {
+export function reviewMessage(collection: string, docId: string, status: 'safe' | 'masked' | 'censored' | 'hide_image') {
   return request<unknown>(`/messages/${collection}/${encodeURIComponent(docId)}`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
@@ -86,6 +86,5 @@ export function reviewMessage(collection: string, docId: string, status: 'safe' 
 }
 
 export async function signedMediaUrl(path: string) {
-  const r = await request<{ url: string }>(`/media/signed-url?path=${encodeURIComponent(path)}`)
-  return r.url
+  return `${API_BASE}/media/content?path=${encodeURIComponent(path)}`
 }

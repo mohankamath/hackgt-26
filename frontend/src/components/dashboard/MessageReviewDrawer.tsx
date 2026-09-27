@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { XIcon, EyeIcon, CircleNotchIcon, ProhibitIcon, PaperPlaneRightIcon, CheckIcon, EyeSlashIcon, ShieldSlashIcon, IdentificationCardIcon } from '@phosphor-icons/react'
 import { reviewMessage, signedMediaUrl } from '../../lib/api'
-import { isAttachmentHidden, isImageAttachment, messageStatus, type FirestoreMessage, type MessageAttachment } from '../../types/message'
+import { isAttachmentHidden, isImageAttachment, isVideoAttachment, messageStatus, type FirestoreMessage, type MessageAttachment } from '../../types/message'
 import type { ContactStatus } from '../../types/safety'
 import { displayPlatform } from '../../types/channel'
 import { Avatar, Button, CategoryTags, SectionLabel, SeverityBadge, StatusBadge } from '../common/ui'
@@ -43,6 +43,8 @@ function ReviewAttachment({ a }: { a: MessageAttachment }) {
       {url && revealed ? (
         isImageAttachment(a) ? (
           <img src={url} alt={a.filename} className={`rounded-lg max-h-72 max-w-full object-contain ${hidden ? 'blur-xl hover:blur-none transition-[filter] duration-300' : ''}`} />
+        ) : isVideoAttachment(a) ? (
+          <video src={url} controls preload="metadata" className="rounded-lg max-h-72 max-w-full" aria-label={a.filename || 'Video'} />
         ) : (
           <a href={url} target="_blank" rel="noreferrer" className="text-sm text-accent underline">Open {a.kind ?? 'file'}</a>
         )
@@ -55,6 +57,9 @@ function ReviewAttachment({ a }: { a: MessageAttachment }) {
     </div>
   )
 }
+
+const hasHiddenImage = (msg: FirestoreMessage) =>
+  !!msg.attachments?.some((a) => isImageAttachment(a))
 
 export default function MessageReviewDrawer({ msg, contactStatus, onClose, onSetContactStatus }: Props) {
   const status = messageStatus(msg)
@@ -80,13 +85,27 @@ export default function MessageReviewDrawer({ msg, contactStatus, onClose, onSet
   }
 
   const override = (s: 'safe' | 'masked' | 'censored') => act(s, () => reviewMessage(msg.collection ?? 'messages', msg.id!, s))
+  const approveImage = () => act('safe', async () => {
+    await reviewMessage(msg.collection ?? 'messages', msg.id!, 'safe')
+    onClose()
+  })
+  const hideImage = () => act('hide_image', async () => {
+    await reviewMessage(msg.collection ?? 'messages', msg.id!, 'hide_image')
+    onClose()
+  })
+  const imageReview = hasHiddenImage(msg)
   const scores = Object.entries(msg.moderation?.scores ?? {}).filter(([, v]) => v >= 0.01)
 
-  const decisions = [
-    { s: 'safe' as const, label: 'Show to child', icon: CheckIcon, variant: 'ok' as const },
-    { s: 'masked' as const, label: 'Mask words', icon: EyeSlashIcon, variant: 'warn' as const },
-    { s: 'censored' as const, label: 'Hide', icon: ShieldSlashIcon, variant: 'danger' as const },
-  ]
+  const decisions = imageReview
+    ? [
+        { key: 'safe', label: 'Approve image', icon: CheckIcon, variant: 'ok' as const, action: approveImage },
+        { key: 'hide_image', label: 'Mask image', icon: EyeSlashIcon, variant: 'warn' as const, action: hideImage },
+      ]
+    : [
+        { key: 'safe', label: 'Show to child', icon: CheckIcon, variant: 'ok' as const, action: () => override('safe') },
+        { key: 'masked', label: 'Mask words', icon: EyeSlashIcon, variant: 'warn' as const, action: () => override('masked') },
+        { key: 'censored', label: 'Hide', icon: ShieldSlashIcon, variant: 'danger' as const, action: () => override('censored') },
+      ]
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-abyss/70 backdrop-blur-sm" onClick={onClose}>
@@ -190,9 +209,9 @@ export default function MessageReviewDrawer({ msg, contactStatus, onClose, onSet
           <footer className="sticky bottom-0 bg-surface/95 backdrop-blur-xl border-t border-line px-6 py-4 flex flex-col gap-3">
             <SectionLabel>Your decision</SectionLabel>
             <div className="grid grid-cols-3 gap-2">
-              {decisions.map(({ s, label, icon: Icon, variant }) => (
-                <Button key={s} size="sm" variant={variant} disabled={!!busy || status === s} onClick={() => override(s)}>
-                  {busy === s ? <CircleNotchIcon size={13} className="animate-spin" /> : <Icon size={13} weight="bold" aria-hidden />}
+              {decisions.map(({ key, label, icon: Icon, variant, action }) => (
+                <Button key={key} size="sm" variant={variant} disabled={!!busy} onClick={action}>
+                  {busy === key ? <CircleNotchIcon size={13} className="animate-spin" /> : <Icon size={13} weight="bold" aria-hidden />}
                   {label}
                 </Button>
               ))}

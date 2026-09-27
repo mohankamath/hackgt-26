@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -46,7 +47,7 @@ class ContactStatusRequest(BaseModel):
 
 
 class ReviewRequest(BaseModel):
-    status: Literal["safe", "masked", "censored"]
+    status: Literal["safe", "masked", "censored", "hide_image"]
 
 
 class DigestRequest(BaseModel):
@@ -182,15 +183,28 @@ def create_app(config: Config | None = None, store: FirestoreDB | None = None, s
             raise HTTPException(404, "message not found")
         except ValueError as exc:
             raise HTTPException(400, str(exc))
+        except Exception as exc:
+            log.exception("message review failed")
+            raise HTTPException(502, f"media review failed: {exc}")
 
     @app.get("/media/signed-url", tags=["messages"])
     async def signed_url(path: str, request: Request):
-        if not path.startswith(("instagram_media/", "instagram_pfps/")):
+        if not path.startswith(("discord_media/", "instagram_media/", "instagram_pfps/")):
             raise HTTPException(400, "invalid path")
         url = await request.app.state.store.signed_url(path)
         if not url:
             raise HTTPException(503, "Firebase Storage is not configured")
         return {"url": url}
+
+    @app.get("/media/content", tags=["messages"])
+    async def media_content(path: str, request: Request):
+        if not path.startswith(("discord_media/", "instagram_media/", "instagram_pfps/")):
+            raise HTTPException(400, "invalid path")
+        result = await request.app.state.store.download_blob(path)
+        if result is None:
+            raise HTTPException(404, "media not found")
+        data, content_type = result
+        return Response(content=data, media_type=content_type, headers={"Cache-Control": "private, max-age=60"})
 
     # ── Contacts / threads / digest ─────────────────────────────────
 

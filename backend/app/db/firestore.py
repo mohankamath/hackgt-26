@@ -53,7 +53,8 @@ class FirestoreDB:
             from firebase_admin import credentials, firestore, storage
 
             if not firebase_admin._apps:
-                options = {"storageBucket": config.firebase_storage_bucket} if config.firebase_storage_bucket else {}
+                bucket_name = self._normalize_bucket_name(config.firebase_storage_bucket)
+                options = {"storageBucket": bucket_name} if bucket_name else {}
                 cred_path = self._resolve_credentials(config.firestore_credentials_path)
                 if not cred_path and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
                     # Without this guard google-auth probes the GCE metadata server and startup stalls.
@@ -63,7 +64,7 @@ class FirestoreDB:
                 else:
                     firebase_admin.initialize_app(options=options or None)
             self.db = firestore.client(database_id=config.firestore_database_id)
-            if config.firebase_storage_bucket:
+            if self._normalize_bucket_name(config.firebase_storage_bucket):
                 try:
                     self.bucket = storage.bucket()
                 except Exception as exc:  # storage is optional
@@ -84,6 +85,13 @@ class FirestoreDB:
                 return str(c)
         log.warning("FIRESTORE_CREDENTIALS_PATH %s not found; trying default credentials", path)
         return None
+
+    @staticmethod
+    def _normalize_bucket_name(value: str) -> str:
+        value = (value or "").strip()
+        if value.startswith("gs://"):
+            return value[5:].split("/", 1)[0]
+        return value.removeprefix("https://storage.googleapis.com/").split("/", 1)[0]
 
     async def _run(self, fn, *args, **kwargs):
         return await asyncio.to_thread(fn, *args, **kwargs)
@@ -274,8 +282,13 @@ class FirestoreDB:
             blob = self.bucket.blob(path)
             blob.upload_from_string(data, content_type=content_type)
             if public:
-                blob.make_public()
-                return blob.public_url
+                try:
+                    blob.make_public()
+                    return blob.public_url
+                except Exception:
+                    # Uniform bucket-level access disables object ACLs. A signed URL
+                    # still lets the child render an approved attachment.
+                    return blob.generate_signed_url(expiration=timedelta(days=7))
             return None
 
         return await self._run(_upload)
@@ -286,8 +299,11 @@ class FirestoreDB:
 
         def _pub() -> str:
             blob = self.bucket.blob(path)
-            blob.make_public()
-            return blob.public_url
+            try:
+                blob.make_public()
+                return blob.public_url
+            except Exception:
+                return blob.generate_signed_url(expiration=timedelta(days=7))
 
         return await self._run(_pub)
 
@@ -299,6 +315,19 @@ class FirestoreDB:
             return self.bucket.blob(path).generate_signed_url(expiration=timedelta(minutes=minutes))
 
         return await self._run(_sign)
+
+    async def download_blob(self, path: str) -> tuple[bytes, str] | None:
+        if self.bucket is None:
+            return None
+
+        def _download() -> tuple[bytes, str] | None:
+            blob = self.bucket.blob(path)
+            if not blob.exists():
+                return None
+            blob.reload()
+            return blob.download_as_bytes(), blob.content_type or "application/octet-stream"
+
+        return await self._run(_download)
 
 
 def utcnow() -> datetime:

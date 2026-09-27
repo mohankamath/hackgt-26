@@ -66,6 +66,8 @@ CATEGORY_RULES: dict[str, dict] = {
 # Categories omni-moderation scores for images (the rest are text-only and return 0).
 IMAGE_CATEGORIES = {
     "sexual",
+    "sexual/minors",
+    "illicit/violent",
     "violence",
     "violence/graphic",
     "self-harm",

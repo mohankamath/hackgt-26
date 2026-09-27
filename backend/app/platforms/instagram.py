@@ -18,6 +18,7 @@ import logging
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from app.config import BACKEND_DIR
 
@@ -63,6 +64,8 @@ def _media_url(msg) -> tuple[str | None, str]:
             url = str(first.get("url") if isinstance(first, dict) else first.url)
         if not url and getattr(media_obj, "url", None):
             url = str(media_obj.url)
+    if url and urlparse(url).path.lower().endswith(".gif"):
+        ctype = "image/gif"
     return url, ctype
 
 
@@ -291,13 +294,18 @@ class InstagramPlatform:
                 mid = str(msg.id)
                 if mid in self._seen:
                     continue
-                self._seen.add(mid)
                 if msg.is_sent_by_viewer or str(msg.user_id or "") == me:
+                    self._seen.add(mid)
                     continue
                 payload = self.build_payload(msg, thread)
                 if payload["text"] or payload["attachments"]:
                     await self.service.submit(payload)
+                    # Only acknowledge after the queue accepts it. A transient queue or
+                    # storage failure must be retried on the next poll.
+                    self._seen.add(mid)
                     queued += 1
+                else:
+                    self._seen.add(mid)
         return queued
 
     def build_payload(self, msg, thread) -> dict:
@@ -311,7 +319,7 @@ class InstagramPlatform:
         attachments = []
         url, ctype = _media_url(msg)
         if url:
-            ext = ".mp4" if ctype.startswith("video") else ".jpg"
+            ext = ".mp4" if ctype.startswith("video") else (".gif" if ctype == "image/gif" else ".jpg")
             attachments.append(
                 {"url": url, "filename": f"{msg.id}{ext}", "type": ctype, "storage_path": f"instagram_media/{msg.id}{ext}"}
             )

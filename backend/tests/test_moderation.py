@@ -29,6 +29,29 @@ async def test_image_flagged(fake_ai):
     assert sent["type"] == "image_url" and sent["image_url"]["url"].startswith("data:image/png;base64,")
 
 
+async def test_image_policy_catches_sexual_content_involving_minors(fake_ai):
+    fake_ai.image_scores = {"sexual/minors": 0.21}
+    result = await image_mod.check_image_bytes(png_bytes())
+    assert result["status"] == "censored"
+    assert result["categories"][0]["category"] == "sexual/minors"
+
+
+async def test_image_model_flag_censors_even_below_policy_threshold(fake_ai, monkeypatch):
+    async def flagged_moderation(_inputs):
+        return {"flagged": True, "categories": {"sexual": True}, "scores": {"sexual": 0.1}}
+
+    monkeypatch.setattr(image_mod.ai, "moderate", flagged_moderation)
+    result = await image_mod.check_image_bytes(png_bytes())
+    assert result["status"] == "censored"
+
+
+async def test_visual_safety_rejection_censors_image(fake_ai):
+    fake_ai.visual_decision = {"allow": False, "labels": ["firearm"], "reason": "weapon visible"}
+    result = await image_mod.check_image_bytes(png_bytes())
+    assert result["status"] == "censored"
+    assert result["categories"][0]["category"] == "visual_safety"
+
+
 async def test_image_safe_ignores_text_only_categories(fake_ai):
     fake_ai.image_scores = {"harassment": 0.99, "sexual": 0.01}
     r = await image_mod.check_image_bytes(png_bytes())
@@ -66,6 +89,18 @@ def test_gif_is_converted():
     Image.new("P", (10, 10)).save(buf, format="GIF")
     out, mime = image_mod.prepare_image(buf.getvalue())
     assert mime in ("image/png", "image/jpeg")
+
+
+async def test_animated_gif_checks_multiple_frames(fake_ai):
+    buf = io.BytesIO()
+    Image.new("RGB", (10, 10), "red").save(
+        buf, format="GIF", save_all=True, append_images=[Image.new("RGB", (10, 10), "blue")], duration=100, loop=0
+    )
+    fake_ai.image_scores = {"sexual": 0.93}
+    result = await image_mod.check_image_bytes(buf.getvalue())
+    assert result["status"] == "censored"
+    assert len(fake_ai.calls) == 1
+    assert len(fake_ai.calls[0]["inputs"]) >= 1
 
 
 # ── Text moderation ─────────────────────────────────────────────────
