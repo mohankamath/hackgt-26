@@ -132,6 +132,38 @@ async def test_flagged_attachment_is_not_public(service, store, fake_ai, monkeyp
     await service.stop()
 
 
+async def test_video_is_rehosted_until_parent_approval(service, store, monkeypatch):
+    from app.moderation import image as image_mod
+
+    async def fake_download(url, session=None):
+        return b"video-bytes"
+
+    monkeypatch.setattr(image_mod, "download_bytes", fake_download)
+    await store.set_contact("discord:99", {"platform": "discord", "user_id": "99", "status": "approved", "message_count": 0})
+    p = payload(
+        1,
+        "",
+        attachments=[
+            {
+                "url": "https://ig/cdn/reel.mp4",
+                "filename": "reel.mp4",
+                "type": "video/mp4",
+                "storage_path": "instagram_media/1.mp4",
+            }
+        ],
+    )
+
+    doc = await service.process_inbound(p)
+    att = doc["attachments"][0]
+    assert doc["status"] == "needs_review"
+    assert att["url"] is None and att["storage_path"] == "instagram_media/1.mp4"
+    assert store.uploads == [{"path": "instagram_media/1.mp4", "public": False, "size": len(b"video-bytes")}]
+
+    reviewed = await service.review_message(fs.MESSAGES, "discord:1", "safe")
+    assert reviewed["attachments"][0]["url"].startswith("https://storage.example/")
+    await service.stop()
+
+
 async def test_avatar_cached_and_rechecked_on_change(service, store, fake_ai, monkeypatch):
     from app.moderation import image as image_mod
     from tests.test_moderation import png_bytes

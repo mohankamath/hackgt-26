@@ -58,8 +58,14 @@ function ReviewAttachment({ a }: { a: MessageAttachment }) {
   )
 }
 
-const hasHiddenImage = (msg: FirestoreMessage) =>
-  !!msg.attachments?.some((a) => isImageAttachment(a))
+const reviewMediaKind = (msg: FirestoreMessage) => {
+  const attachments = msg.attachments ?? []
+  const hasImage = attachments.some((a) => isImageAttachment(a))
+  const hasVideo = attachments.some((a) => isVideoAttachment(a))
+  if (hasVideo && !hasImage) return 'video'
+  if (hasImage && !hasVideo) return 'image'
+  return hasImage || hasVideo ? 'media' : null
+}
 
 export default function MessageReviewDrawer({ msg, contactStatus, onClose, onSetContactStatus }: Props) {
   const status = messageStatus(msg)
@@ -85,21 +91,22 @@ export default function MessageReviewDrawer({ msg, contactStatus, onClose, onSet
   }
 
   const override = (s: 'safe' | 'masked' | 'censored') => act(s, () => reviewMessage(msg.collection ?? 'messages', msg.id!, s))
-  const approveImage = () => act('safe', async () => {
+  const approveMedia = () => act('safe', async () => {
     await reviewMessage(msg.collection ?? 'messages', msg.id!, 'safe')
     onClose()
   })
-  const hideImage = () => act('hide_image', async () => {
+  const hideMedia = () => act('hide_image', async () => {
     await reviewMessage(msg.collection ?? 'messages', msg.id!, 'hide_image')
     onClose()
   })
-  const imageReview = hasHiddenImage(msg)
+  const mediaKind = reviewMediaKind(msg)
+  const mediaReview = mediaKind !== null
   const scores = Object.entries(msg.moderation?.scores ?? {}).filter(([, v]) => v >= 0.01)
 
-  const decisions = imageReview
+  const decisions = mediaReview
     ? [
-        { key: 'safe', label: 'Approve image', icon: CheckIcon, variant: 'ok' as const, action: approveImage },
-        { key: 'hide_image', label: 'Mask image', icon: EyeSlashIcon, variant: 'warn' as const, action: hideImage },
+        { key: 'safe', label: `Approve ${mediaKind}`, icon: CheckIcon, variant: 'ok' as const, action: approveMedia },
+        { key: 'hide_image', label: `Mask ${mediaKind}`, icon: EyeSlashIcon, variant: 'warn' as const, action: hideMedia },
       ]
     : [
         { key: 'safe', label: 'Show to child', icon: CheckIcon, variant: 'ok' as const, action: () => override('safe') },

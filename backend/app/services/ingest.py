@@ -196,8 +196,6 @@ class ScreenedService:
                     log.warning("media upload failed for %s: %s", storage_path, exc)
                     if hidden := flagged or v["status"] == "needs_review":
                         review_url = url
-            elif storage_path and v["kind"] == "video":
-                storage_path = None  # videos are not re-hosted; parent reviews via the source URL
             hidden = v["status"] in ("censored", "needs_review")
             out.append(
                 {
@@ -455,7 +453,7 @@ class ScreenedService:
             text_status = "masked" if text_risk and msg.get("masked_content") else ("censored" if text_risk else "safe")
             atts = []
             for attachment in msg.get("attachments") or []:
-                if pipeline.attachment_kind(attachment) == "image":
+                if pipeline.attachment_kind(attachment) in ("image", "video"):
                     attachment = {**attachment, "url": None, "status": "censored", "flagged": True}
                 atts.append(attachment)
             patch = {

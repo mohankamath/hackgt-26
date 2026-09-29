@@ -86,5 +86,6 @@ export function reviewMessage(collection: string, docId: string, status: 'safe' 
 }
 
 export async function signedMediaUrl(path: string) {
-  return `${API_BASE}/media/content?path=${encodeURIComponent(path)}`
+  const result = await request<{ url: string }>(`/media/signed-url?path=${encodeURIComponent(path)}`)
+  return result.url
 }

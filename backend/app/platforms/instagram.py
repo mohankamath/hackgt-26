@@ -33,40 +33,118 @@ RATE_LIMIT_SLEEP_SECONDS = 600
 MIN_ANDROID_API = 28
 
 
+def _value(obj, key: str):
+    if isinstance(obj, dict):
+        return obj.get(key)
+    return getattr(obj, key, None)
+
+
+def _url(value) -> str | None:
+    if not value:
+        return None
+    return str(value)
+
+
+def _image_candidate(value) -> str | None:
+    versions = _value(value, "image_versions2")
+    candidates = _value(versions, "candidates") if versions else None
+    if candidates:
+        return _url(_value(candidates[0], "url"))
+    return None
+
+
+def _media_value_url(value) -> tuple[str | None, str]:
+    """Extract a URL and type from an instagrapi media-like object."""
+    if not value:
+        return None, "image/jpeg"
+
+    videos = _value(value, "video_versions") or []
+    if videos:
+        video_url = _url(_value(videos[0], "url"))
+        if video_url:
+            return video_url, "video/mp4"
+
+    for key in ("video_url", "url"):
+        media_url = _url(_value(value, key))
+        if media_url:
+            return media_url, "video/mp4" if key == "video_url" else "image/jpeg"
+
+    image_url = _image_candidate(value)
+    if image_url:
+        return image_url, "image/jpeg"
+
+    for key in ("thumbnail_url", "preview_url", "image_url", "link_image_url"):
+        image_url = _url(_value(value, key))
+        if image_url:
+            mime = _value(value, "preview_url_mime_type") or "image/jpeg"
+            return image_url, str(mime)
+    return None, "image/jpeg"
+
+
+def _nested_media_url(value, depth: int = 0) -> str | None:
+    """Find a URL in animated-media image dictionaries without scanning arbitrary text."""
+    if depth > 4 or not value:
+        return None
+    if isinstance(value, str):
+        return value if value.startswith(("http://", "https://")) else None
+    if isinstance(value, list):
+        for item in value:
+            found = _nested_media_url(item, depth + 1)
+            if found:
+                return found
+        return None
+    for key in ("url", "video_url", "image_url", "original", "fixed_height", "fixed_width", "downsized", "images", "gif"):
+        found = _nested_media_url(_value(value, key), depth + 1)
+        if found:
+            return found
+    return None
+
+
 def _media_url(msg) -> tuple[str | None, str]:
-    """Extract (url, content_type) from a DirectMessage using the original's 4 fallback paths."""
-    url, ctype = None, "image/jpeg"
-    media = getattr(msg, "media", None)
-    if media:
-        iv2 = getattr(media, "image_versions2", None)
-        candidates = getattr(iv2, "candidates", None) if iv2 else None
-        if candidates:
-            first = candidates[0]
-            url = str(first.get("url") if isinstance(first, dict) else first.url)
-        if not url and getattr(media, "thumbnail_url", None):
-            url = str(media.thumbnail_url)
-        if not url and getattr(media, "url", None):
-            url = str(media.url)
-        videos = getattr(media, "video_versions", None)
-        if videos:
-            ctype = "video/mp4"
-            v0 = videos[0]
-            video_url = v0.get("url") if isinstance(v0, dict) else getattr(v0, "url", None)
-            if video_url:
-                url = str(video_url)
-    vm = getattr(msg, "visual_media", None)
-    if not url and vm:
-        media_obj = getattr(vm, "media", None) or vm
-        iv2 = getattr(media_obj, "image_versions2", None)
-        candidates = getattr(iv2, "candidates", None) if iv2 else None
-        if candidates:
-            first = candidates[0]
-            url = str(first.get("url") if isinstance(first, dict) else first.url)
-        if not url and getattr(media_obj, "url", None):
-            url = str(media_obj.url)
-    if url and urlparse(url).path.lower().endswith(".gif"):
-        ctype = "image/gif"
-    return url, ctype
+    """Extract native images, GIFs, stickers, shared Reels, and videos from a DM."""
+    candidates = [
+        (getattr(msg, "media", None), False),
+        (getattr(msg, "visual_media", None), False),
+        (getattr(msg, "media_share", None), False),
+        (getattr(msg, "reel_share", None), False),
+        (getattr(msg, "clip", None), False),
+        (getattr(msg, "xma_share", None), False),
+        (getattr(msg, "generic_xma", None), False),
+        (getattr(msg, "animated_media", None), True),
+    ]
+    for value, animated in candidates:
+        if not value:
+            continue
+        values = value if isinstance(value, list) else [value]
+        for item in values:
+            media_obj = _value(item, "media") or _value(item, "reel_media") or item
+            url, ctype = _media_value_url(media_obj)
+            if not url and animated:
+                url = _nested_media_url(item)
+                ctype = "image/gif"
+            if url:
+                if animated or urlparse(url).path.lower().endswith(".gif"):
+                    ctype = "image/gif"
+                return url, ctype
+
+    # A shared Giphy/sticker link often has no media object, but does include an
+    # Open Graph image in MessageLink.link_context.
+    link = getattr(msg, "link", None)
+    context = _value(link, "link_context") if link else None
+    if context:
+        url = _url(_value(context, "link_image_url"))
+        if url:
+            ctype = "image/gif" if urlparse(url).path.lower().endswith(".gif") else "image/jpeg"
+            return url, ctype
+    return None, "image/jpeg"
+
+
+def _is_instagram_page_url(url: str | None) -> bool:
+    if not url:
+        return False
+    host = (urlparse(url).hostname or "").lower()
+    path = urlparse(url).path.lower()
+    return host in {"instagram.com", "www.instagram.com"} and path.startswith(("/reel/", "/p/", "/tv/"))
 
 
 class InstagramPlatform:
@@ -298,6 +376,7 @@ class InstagramPlatform:
                     self._seen.add(mid)
                     continue
                 payload = self.build_payload(msg, thread)
+                await self._resolve_shared_media(payload)
                 if payload["text"] or payload["attachments"]:
                     await self.service.submit(payload)
                     # Only acknowledge after the queue accepts it. A transient queue or
@@ -307,6 +386,33 @@ class InstagramPlatform:
                 else:
                     self._seen.add(mid)
         return queued
+
+    async def _resolve_shared_media(self, payload: dict) -> None:
+        """Resolve XMA Reel page links to CDN video URLs before downloading them."""
+        for attachment in payload.get("attachments") or []:
+            source_url = attachment.get("url")
+            if not _is_instagram_page_url(source_url) or not (attachment.get("type") or "").startswith("video/"):
+                continue
+            try:
+                media_pk = await asyncio.to_thread(self.cl.media_pk_from_url, source_url)
+                media = await asyncio.to_thread(self.cl.media_info, media_pk)
+                video_url = getattr(media, "video_url", None)
+                if video_url:
+                    attachment["url"] = str(video_url)
+                    continue
+                resources = getattr(media, "resources", None) or []
+                video_url = next((getattr(resource, "video_url", None) for resource in resources if getattr(resource, "video_url", None)), None)
+                if video_url:
+                    attachment["url"] = str(video_url)
+                    continue
+                raise RuntimeError("media_info returned no video URL")
+            except Exception as exc:
+                # Do not save an HTML Reel page under an .mp4 filename. Preserve it as
+                # a reviewable link if Instagram does not expose the CDN media URL.
+                log.warning("could not resolve Instagram shared media %s: %s", source_url, exc)
+                attachment["type"] = "text/uri-list"
+                attachment["filename"] = f"{payload['message_id']}.url"
+                attachment["storage_path"] = None
 
     def build_payload(self, msg, thread) -> dict:
         me = str(self.cl.user_id)

@@ -35,8 +35,34 @@ async def moderate_attachment(att: dict, sensitivity: str) -> dict:
     """Moderate one attachment. Returns the image verdict plus ``kind`` and optional ``_bytes``
     (downloaded content kept in memory so the caller can upload it without re-downloading)."""
     kind = attachment_kind(att)
+    if kind == "video":
+        data = att.get("bytes")
+        if data is None and att.get("storage_path") and att.get("url"):
+            try:
+                data = await image_mod.download_bytes(att["url"])
+            except Exception as exc:
+                return {
+                    "kind": kind,
+                    "flagged": False,
+                    "status": "needs_review",
+                    "categories": [],
+                    "scores": {},
+                    "severity": "none",
+                    "error": f"video download failed: {exc}",
+                }
+        result = {
+            "kind": kind,
+            "flagged": False,
+            "status": "needs_review",
+            "categories": [],
+            "scores": {},
+            "severity": "none",
+            "error": "Videos can't be scanned automatically",
+        }
+        if data is not None:
+            result["_bytes"] = data
+        return result
     if kind != "image":
-        label = "Videos can't be scanned automatically" if kind == "video" else "File type can't be scanned automatically"
         return {
             "kind": kind,
             "flagged": False,
@@ -44,7 +70,7 @@ async def moderate_attachment(att: dict, sensitivity: str) -> dict:
             "categories": [],
             "scores": {},
             "severity": "none",
-            "error": label,
+            "error": "File type can't be scanned automatically",
         }
 
     data = att.get("bytes")
